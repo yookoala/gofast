@@ -20,9 +20,9 @@ import (
 	"time"
 )
 
-// request holds the state for an in-progress request. As soon as it's complete,
+// fcgiRequest holds the state for an in-progress request. As soon as it's complete,
 // it's converted to an http.Request.
-type request struct {
+type fcgiRequest struct {
 	pw        *io.PipeWriter
 	reqID     uint16
 	params    map[string]string
@@ -31,8 +31,8 @@ type request struct {
 	keepConn  bool
 }
 
-func newRequest(reqID uint16, flags uint8) *request {
-	r := &request{
+func newRequest(reqID uint16, flags uint8) *fcgiRequest {
+	r := &fcgiRequest{
 		reqID:    reqID,
 		params:   map[string]string{},
 		keepConn: flags&flagKeepConn != 0,
@@ -42,7 +42,7 @@ func newRequest(reqID uint16, flags uint8) *request {
 }
 
 // parseParams reads an encoded []byte into Params.
-func (r *request) parseParams() {
+func (r *fcgiRequest) parseParams() {
 	text := r.rawParams
 	r.rawParams = nil
 	for len(text) > 0 {
@@ -66,13 +66,13 @@ func (r *request) parseParams() {
 
 // response implements http.ResponseWriter.
 type response struct {
-	req         *request
+	req         *fcgiRequest
 	header      http.Header
 	w           *bufWriter
 	wroteHeader bool
 }
 
-func newResponse(c *child, req *request) *response {
+func newResponse(c *child, req *fcgiRequest) *response {
 	return &response{
 		req:    req,
 		header: http.Header{},
@@ -130,15 +130,15 @@ type child struct {
 	conn    *conn
 	handler http.Handler
 
-	mu       sync.Mutex          // protects requests:
-	requests map[uint16]*request // keyed by request ID
+	mu       sync.Mutex              // protects requests:
+	requests map[uint16]*fcgiRequest // keyed by request ID
 }
 
 func newChild(rwc io.ReadWriteCloser, handler http.Handler) *child {
 	return &child{
 		conn:     newConn(rwc),
 		handler:  handler,
-		requests: make(map[uint16]*request),
+		requests: make(map[uint16]*fcgiRequest),
 	}
 }
 
@@ -256,7 +256,7 @@ func (c *child) handleRecord(rec *record) error {
 	}
 }
 
-func (c *child) serveRequest(req *request, body io.ReadCloser) {
+func (c *child) serveRequest(req *fcgiRequest, body io.ReadCloser) {
 	r := newResponse(c, req)
 	httpReq, err := cgi.RequestFromMap(req.params)
 	if err != nil {
