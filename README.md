@@ -1,6 +1,11 @@
 gofast
 ======
 
+[![Travis CI results][travis]](https://travis-ci.org/yookoala/gofast)
+
+[travis]: https://api.travis-ci.org/yookoala/gofast.svg?branch=master
+
+
 **gofast** is a [FastCGI](http://www.fastcgi.com/devkit/doc/fcgi-spec.html)
 client library written purely in go.
 
