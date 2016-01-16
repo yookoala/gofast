@@ -43,6 +43,7 @@ Your are welcome to contribute to this library.
 To report bug, please use the [issue tracker][issue tracker].
 
 To fix an existing bug or implement a new feature, please:
+
 1. Check the [issue tracker][issue tracker] and [pull requests][pull requests] for existing discussion.
 2. If not, please open a new issue for discussion.
 3. Write tests.
