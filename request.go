@@ -1,11 +1,22 @@
 package gofast
 
-// Request is an interface of a standard
+// Request hold information of a standard
 // FastCGI request
-type Request struct {
+type Request interface {
+	// GetID returns request ID
+	GetID() uint16
 }
 
-// NewRequest returns a standard FastCGI request
-func NewRequest() *Request {
-	return &Request{}
+// request is the default implementation of Request
+type request struct {
+	reqID     uint16
+	params    map[string]string
+	buf       [1024]byte
+	rawParams []byte
+	keepConn  bool
+}
+
+// GetID implements Request interface
+func (r *request) GetID() uint16 {
+	return r.reqID
 }

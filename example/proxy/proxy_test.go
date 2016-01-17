@@ -28,7 +28,8 @@ func TestProxy(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %#v", err.Error())
 	}
-	p := proxy.New(l.Addr().String())
+
+	p := proxy.New(l.Addr().Network(), l.Addr().String())
 	w := httptest.NewRecorder()
 	r, err := http.NewRequest("GET", "/add", nil)
 	if err != nil {
