@@ -164,15 +164,25 @@ type Client interface {
 }
 
 // NewClient returns a Client of the given
-// connection (net.Conn)
-func NewClient(conn net.Conn) Client {
+// connection (net.Conn).
+//
+// limit is the maximum number of request that the
+// applcation support. 0 means the maximum number
+// available for 16bit request id (65536).
+// Default 0.
+//
+func NewClient(conn net.Conn, limit uint32) Client {
 	cid := make(chan uint16)
-	go func() {
-		for i := uint16(0); i < 65535; i++ {
+
+	if limit == 0 || limit > 65536 {
+		limit = 65536
+	}
+	go func(maxID uint16) {
+		for i := uint16(0); i < maxID; i++ {
 			cid <- i
 		}
-		cid <- uint16(65535)
-	}()
+		cid <- uint16(maxID)
+	}(uint16(limit - 1))
 
 	return &client{
 		conn:   newConn(conn),

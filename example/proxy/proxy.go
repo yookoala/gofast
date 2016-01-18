@@ -39,7 +39,7 @@ func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c := gofast.NewClient(conn)
+	c := gofast.NewClient(conn, 0)
 	req := c.NewRequest(r)
 
 	// some input for req

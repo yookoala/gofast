@@ -16,6 +16,10 @@ import (
 	"github.com/yookoala/gofast"
 )
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
 func newApp(network, address string, fn http.HandlerFunc) (l net.Listener, err error) {
 	l, err = net.Listen(network, address)
 	if err != nil {
@@ -26,7 +30,10 @@ func newApp(network, address string, fn http.HandlerFunc) (l net.Listener, err e
 }
 
 func TestClient_NewRequest(t *testing.T) {
-	c := gofast.NewClient(nil)
+
+	t.Logf("default limit: %d", 65535)
+
+	c := gofast.NewClient(nil, 0)
 
 	for i := uint32(0); i <= 65535; i++ {
 		r := c.NewRequest(nil)
@@ -66,6 +73,51 @@ func TestClient_NewRequest(t *testing.T) {
 	}
 }
 
+func TestClient_NewRequestWithLimit(t *testing.T) {
+
+	limit := uint32(rand.Int31n(100) + 10)
+	t.Logf("random limit: %d", limit)
+
+	c := gofast.NewClient(nil, limit)
+
+	for i := uint32(0); i < limit; i++ {
+		r := c.NewRequest(nil)
+		if want, have := uint16(i), r.ID; want != have {
+			t.Errorf("expected %d, got %d", want, have)
+		}
+	}
+
+	// test if client can allocate new request
+	// when all request ids are already allocated
+	newAlloc := make(chan uint16)
+	go func(c gofast.Client, newAlloc chan<- uint16) {
+		r := c.NewRequest(nil) // should be blocked before releaseID call
+		newAlloc <- r.ID
+	}(c, newAlloc)
+
+	select {
+	case reqID := <-newAlloc:
+		t.Errorf("unexpected new allocation: %d", reqID)
+	case <-time.After(time.Millisecond * 100):
+		t.Log("blocks as expected")
+	}
+
+	// now, release a random ID
+	released := uint16(rand.Int31n(int32(limit)))
+	go func(c gofast.Client, released uint16) {
+		c.ReleaseID(released)
+	}(c, released)
+
+	select {
+	case reqID := <-newAlloc:
+		if want, have := released, reqID; want != have {
+			t.Errorf("expected %d, got %d", want, have)
+		}
+	case <-time.After(time.Millisecond * 100):
+		t.Errorf("unexpected blocking")
+	}
+}
+
 func TestClient_StdErr(t *testing.T) {
 
 	// proxy implements Proxy interface
@@ -85,7 +137,7 @@ func TestClient_StdErr(t *testing.T) {
 			return
 		}
 
-		c := gofast.NewClient(conn)
+		c := gofast.NewClient(conn, 0)
 		req := c.NewRequest(nil)
 
 		// Some required paramters with invalid values
