@@ -186,14 +186,17 @@ func (pipes *ResponsePipe) Close() {
 // WriteTo writes the given output into http.ResponseWriter
 func (pipes *ResponsePipe) WriteTo(rw http.ResponseWriter, ew io.Writer) {
 	wg := new(sync.WaitGroup)
-	wg.Add(1)
+	wg.Add(2)
 
 	go func() {
 		defer wg.Done()
 		pipes.writeResponse(rw)
 	}()
 
-	// FIXME, add goroutine for writeError, need test
+	go func() {
+		defer wg.Done()
+		pipes.writeError(ew)
+	}()
 
 	// blocks until all reads and writes are done
 	wg.Wait()

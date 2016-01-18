@@ -28,7 +28,7 @@ func TestProxy(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %#v", err.Error())
 	}
-	sock := dir + "/test.sock"
+	sock := dir + "/example.proxy.sock"
 
 	// create temporary fcgi application server
 	// that listens to the socket
