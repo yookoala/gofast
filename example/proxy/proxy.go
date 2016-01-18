@@ -66,7 +66,15 @@ func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// some input for req
 	req.Params["hello"] = "world"
 	req.Params["foo"] = "bar"
-	req.Content = []byte("foo bar") // FIXME: somehow need content, find out why
+
+	// FIXME: Stdin should be a Reader / ReadCloser
+	//        instead of []byte.
+	//
+	//        Pass the r.Body (ReadCloser) to
+	//        modified version of writeRecord
+	//        instead of storing another copy of body
+	//        in memory
+	req.Stdin = []byte(r.Form.Encode())
 
 	// a buffer to read
 	pipe := gofast.NewResponsePipe()

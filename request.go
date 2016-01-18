@@ -5,7 +5,7 @@ package gofast
 type Request struct {
 	ID       uint16
 	Params   map[string]string
-	Content  []byte
+	Stdin    []byte
 	KeepConn bool
 }
 

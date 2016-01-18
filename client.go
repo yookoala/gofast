@@ -66,11 +66,9 @@ func (c *client) Handle(w *ResponsePipe, req *Request) (err error) {
 	if err != nil {
 		return
 	}
-	if len(req.Content) > 0 {
-		err = c.conn.writeRecord(typeStdin, req.GetID(), req.Content)
-		if err != nil {
-			return
-		}
+	err = c.conn.writeRecord(typeStdin, req.GetID(), req.Stdin)
+	if err != nil {
+		return
 	}
 
 	var rec record
