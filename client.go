@@ -34,27 +34,18 @@ type Request struct {
 
 // client is the default implementation of Client
 type client struct {
-	conn *conn
-
+	conn   *conn
 	chanID chan uint16
-	ids    map[uint16]bool
 }
 
 // AllocID implements Client.AllocID
 func (c *client) AllocID() (reqID uint16) {
-	for {
-		reqID = <-c.chanID
-		if c.ids[reqID] != true {
-			break
-		}
-	}
-	c.ids[reqID] = true
+	reqID = <-c.chanID
 	return
 }
 
 // ReleaseID implements Client.ReleaseID
 func (c *client) ReleaseID(reqID uint16) {
-	c.ids[reqID] = false
 	go func() {
 		// release the ID back to channel for reuse
 		// use goroutine to prevent blocking ReleaseID
@@ -185,7 +176,6 @@ func NewClient(conn net.Conn) Client {
 
 	return &client{
 		conn:   newConn(conn),
-		ids:    make(map[uint16]bool),
 		chanID: cid,
 	}
 }
