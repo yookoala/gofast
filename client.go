@@ -13,7 +13,6 @@ package gofast
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -21,6 +20,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // client is the default implementation of Client
@@ -53,44 +53,53 @@ func (c *client) ReleaseID(reqID uint16) {
 	}()
 }
 
-// Handle implements Client.Handle
-func (c *client) Handle(w *ResponsePipe, req *Request) (err error) {
-	defer c.ReleaseID(req.GetID())
-	defer w.StdOutWriter.Close()
+// Do implements Client.Do
+func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
+	resp = NewResponsePipe()
+
+	// FIXME: add other role implementation, add role field to Request
 	err = c.conn.writeBeginRequest(req.GetID(), uint16(roleResponder), 0)
 	if err != nil {
+		resp.Close()
 		return
 	}
 	err = c.conn.writePairs(typeParams, req.GetID(), req.Params)
 	if err != nil {
+		resp.Close()
 		return
 	}
 	err = c.conn.writeRecord(typeStdin, req.GetID(), req.Stdin)
 	if err != nil {
+		resp.Close()
 		return
 	}
 
 	var rec record
 
-readLoop:
-	for {
-		if err := rec.read(c.conn.rwc); err != nil {
-			break
-		}
+	// NOTE: all errors return before goroutine (readLoop)
+	go func() {
+		defer c.ReleaseID(req.GetID())
+		defer resp.Close()
+	readLoop:
+		for {
+			if err := rec.read(c.conn.rwc); err != nil {
+				break
+			}
 
-		// different output type for different stream
-		switch rec.h.Type {
-		case typeStdout:
-			w.StdOutWriter.Write(rec.content())
-		case typeStderr:
-			w.StdErrBuffer.Write(rec.content())
-		case typeEndRequest:
-			break readLoop
-		default:
-			panic(fmt.Sprintf("unexpected type %#v in readLoop", rec.h.Type))
+			// different output type for different stream
+			switch rec.h.Type {
+			case typeStdout:
+				resp.stdOutWriter.Write(rec.content())
+			case typeStderr:
+				resp.stdErrWriter.Write(rec.content())
+			case typeEndRequest:
+				break readLoop
+			default:
+				panic(fmt.Sprintf("unexpected type %#v in readLoop", rec.h.Type))
+			}
 		}
-	}
+	}()
 
 	return
 }
@@ -108,8 +117,8 @@ func (c *client) NewRequest() *Request {
 // connection (net.Conn)
 type Client interface {
 
-	// Handle takes care of a proper FastCGI request
-	Handle(pipes *ResponsePipe, req *Request) (err error)
+	// Do takes care of a proper FastCGI request
+	Do(req *Request) (resp *ResponsePipe, err error)
 
 	// NewRequest returns a standard FastCGI request
 	// with a unique request ID allocted by the client
@@ -145,22 +154,52 @@ func NewClient(conn net.Conn) Client {
 // NewResponsePipe returns an initialized new ResponsePipe struct
 func NewResponsePipe() (p *ResponsePipe) {
 	p = new(ResponsePipe)
-	p.StdOutReader, p.StdOutWriter = io.Pipe()
-	p.StdErrBuffer = new(bytes.Buffer)
+	p.stdOutReader, p.stdOutWriter = io.Pipe()
+	p.stdErrReader, p.stdErrWriter = io.Pipe()
 	return
 }
 
 // ResponsePipe contains readers and writers that handles
 // all FastCGI output streams
 type ResponsePipe struct {
-	StdOutReader io.Reader
-	StdOutWriter io.WriteCloser
-	StdErrBuffer *bytes.Buffer
+	stdOutReader io.Reader
+	stdOutWriter io.WriteCloser
+	stdErrReader io.Reader
+	stdErrWriter io.WriteCloser
+}
+
+// Close close all writers
+func (pipes *ResponsePipe) Close() {
+	pipes.stdOutWriter.Close()
+	pipes.stdErrWriter.Close()
 }
 
 // WriteTo writes the given output into http.ResponseWriter
-func (pipes *ResponsePipe) WriteTo(w http.ResponseWriter) {
-	linebody := bufio.NewReaderSize(pipes.StdOutReader, 1024)
+func (pipes *ResponsePipe) WriteTo(rw http.ResponseWriter, ew io.Writer) {
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		pipes.writeResponse(rw)
+	}()
+
+	// FIXME, add goroutine for writeError, need test
+
+	// blocks until all reads and writes are done
+	wg.Wait()
+}
+
+func (pipes *ResponsePipe) writeError(w io.Writer) {
+	_, err := io.Copy(w, pipes.stdErrReader)
+	if err != nil {
+		log.Printf("gofast: copy error: %v", err)
+	}
+}
+
+// writeTo writes the given output into http.ResponseWriter
+func (pipes *ResponsePipe) writeResponse(w http.ResponseWriter) {
+	linebody := bufio.NewReaderSize(pipes.stdOutReader, 1024)
 	headers := make(http.Header)
 	statusCode := 0
 	headerLines := 0
