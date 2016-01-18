@@ -23,6 +23,15 @@ import (
 	"sync"
 )
 
+// Request hold information of a standard
+// FastCGI request
+type Request struct {
+	ID       uint16
+	Params   map[string]string
+	Stdin    []byte
+	KeepConn bool
+}
+
 // client is the default implementation of Client
 type client struct {
 	conn *conn
