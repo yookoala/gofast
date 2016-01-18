@@ -49,7 +49,7 @@ func TestProxy(t *testing.T) {
 	}
 	p.ServeHTTP(w, r)
 
-	if notWant, have := "", w.Body.String(); notWant == have {
-		t.Errorf("not expected %#v, got %#v", notWant, have)
+	if want, have := "hello world", w.Body.String(); want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
 	}
 }

@@ -1,7 +1,6 @@
 package proxy
 
 import (
-	"bytes"
 	"log"
 	"net"
 	"net/http"
@@ -70,21 +69,22 @@ func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	req.Content = []byte("foo bar") // FIXME: somehow need content, find out why
 
 	// a buffer to read
-	wResp := new(bytes.Buffer)
-	wErr := new(bytes.Buffer)
+	pipe := gofast.NewResponsePipe()
 
-	// handl the result
-	err = c.Handle(wResp, wErr, req)
-	if err != nil {
-		http.Error(w, "failed to process request", http.StatusInternalServerError)
+	// handle the result
+	// FIXME: if no output, show internal server error / proxy error
+	go pipe.WriteTo(w)
+	if err := c.Handle(pipe, req); err != nil {
+		//http.Error(w, "failed to process request", http.StatusInternalServerError)
 		log.Printf("gofast: unable to process request "+
 			"(network=%#v, address=%#v, error=%#v)",
 			p.network, p.address, err.Error())
 		return
-	} else if wErr.Len() != 0 {
-		log.Printf("gofast: error stream from FastCGI application "+
-			"(network=%#v, address=%#v, error=%#v)",
-			p.network, p.address, wErr.String())
 	}
-	w.Write(wResp.Bytes())
+	if pipe.StdErrBuffer.Len() > 0 {
+		log.Printf("gofast: error stream from application process "+
+			"(network=%#v, address=%#v, error=%#v)",
+			p.network, p.address, pipe.StdErrBuffer.String())
+		return
+	}
 }
