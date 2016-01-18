@@ -40,29 +40,7 @@ func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := gofast.NewClient(conn)
-	req := c.NewRequest()
-
-	// some required cgi parameters
-	req.Params["REQUEST_METHOD"] = r.Method
-	req.Params["SERVER_PROTOCOL"] = r.Proto
-
-	/*
-		// FIXME: add these parameter automatically
-		// from net/cgi Handler.ServeHTTP
-		// should add later
-		"SERVER_SOFTWARE=go",
-		"SERVER_NAME=" + req.Host,
-		"SERVER_PROTOCOL=HTTP/1.1",
-		"HTTP_HOST=" + req.Host,
-		"GATEWAY_INTERFACE=CGI/1.1",
-		"REQUEST_METHOD=" + req.Method,
-		"QUERY_STRING=" + req.URL.RawQuery,
-		"REQUEST_URI=" + req.URL.RequestURI(),
-		"PATH_INFO=" + pathInfo,
-		"SCRIPT_NAME=" + root,
-		"SCRIPT_FILENAME=" + h.Path,
-		"SERVER_PORT=" + port,
-	*/
+	req := c.NewRequest(r)
 
 	// some input for req
 	req.Params["hello"] = "world"

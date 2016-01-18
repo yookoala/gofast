@@ -114,11 +114,41 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 }
 
 // NewRequest implements Client.NewRequest
-func (c *client) NewRequest() *Request {
-	return &Request{
+func (c *client) NewRequest(r *http.Request) (req *Request) {
+	req = &Request{
 		ID:     c.AllocID(),
 		Params: make(map[string]string),
 	}
+
+	// if no http request, return here
+	if r == nil {
+		return
+	}
+
+	// define some required cgi parameters
+	// with the given http request
+	req.Params["REQUEST_METHOD"] = r.Method
+	req.Params["SERVER_PROTOCOL"] = r.Proto
+
+	/*
+		// FIXME: add these parameter automatically
+		// from net/cgi Handler.ServeHTTP
+		// should add later
+		"SERVER_SOFTWARE=go",
+		"SERVER_NAME=" + req.Host,
+		"SERVER_PROTOCOL=HTTP/1.1",
+		"HTTP_HOST=" + req.Host,
+		"GATEWAY_INTERFACE=CGI/1.1",
+		"REQUEST_METHOD=" + req.Method,
+		"QUERY_STRING=" + req.URL.RawQuery,
+		"REQUEST_URI=" + req.URL.RequestURI(),
+		"PATH_INFO=" + pathInfo,
+		"SCRIPT_NAME=" + root,
+		"SCRIPT_FILENAME=" + h.Path,
+		"SERVER_PORT=" + port,
+	*/
+
+	return
 }
 
 // Client is a client interface of FastCGI
@@ -131,7 +161,7 @@ type Client interface {
 
 	// NewRequest returns a standard FastCGI request
 	// with a unique request ID allocted by the client
-	NewRequest() *Request
+	NewRequest(*http.Request) *Request
 
 	// AllocID allocates a new reqID.
 	// It blocks if all possible uint16 IDs are allocated.

@@ -29,7 +29,7 @@ func TestClient_NewRequest(t *testing.T) {
 	c := gofast.NewClient(nil)
 
 	for i := uint32(0); i <= 65535; i++ {
-		r := c.NewRequest()
+		r := c.NewRequest(nil)
 		if want, have := uint16(i), r.ID; want != have {
 			t.Errorf("expected %d, got %d", want, have)
 		}
@@ -39,7 +39,7 @@ func TestClient_NewRequest(t *testing.T) {
 	// when all request ids are already allocated
 	newAlloc := make(chan uint16)
 	go func(c gofast.Client, newAlloc chan<- uint16) {
-		r := c.NewRequest() // should be blocked before releaseID call
+		r := c.NewRequest(nil) // should be blocked before releaseID call
 		newAlloc <- r.ID
 	}(c, newAlloc)
 
@@ -86,7 +86,7 @@ func TestClient_StdErr(t *testing.T) {
 		}
 
 		c := gofast.NewClient(conn)
-		req := c.NewRequest()
+		req := c.NewRequest(nil)
 
 		// Some required paramters with invalid values
 		req.Params["REQUEST_METHOD"] = ""
