@@ -59,17 +59,17 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 	resp = NewResponsePipe()
 
 	// FIXME: add other role implementation, add role field to Request
-	err = c.conn.writeBeginRequest(req.GetID(), uint16(roleResponder), 0)
+	err = c.conn.writeBeginRequest(req.ID, uint16(roleResponder), 0)
 	if err != nil {
 		resp.Close()
 		return
 	}
-	err = c.conn.writePairs(typeParams, req.GetID(), req.Params)
+	err = c.conn.writePairs(typeParams, req.ID, req.Params)
 	if err != nil {
 		resp.Close()
 		return
 	}
-	err = c.conn.writeRecord(typeStdin, req.GetID(), req.Stdin)
+	err = c.conn.writeRecord(typeStdin, req.ID, req.Stdin)
 	if err != nil {
 		resp.Close()
 		return
@@ -79,7 +79,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
 	// NOTE: all errors return before goroutine (readLoop)
 	go func() {
-		defer c.ReleaseID(req.GetID())
+		defer c.ReleaseID(req.ID)
 		defer resp.Close()
 	readLoop:
 		for {

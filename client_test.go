@@ -13,7 +13,7 @@ func TestClient_NewRequest(t *testing.T) {
 
 	for i := uint32(0); i <= 65535; i++ {
 		r := c.NewRequest()
-		if want, have := uint16(i), r.GetID(); want != have {
+		if want, have := uint16(i), r.ID; want != have {
 			t.Errorf("expected %d, got %d", want, have)
 		}
 	}
@@ -23,7 +23,7 @@ func TestClient_NewRequest(t *testing.T) {
 	newAlloc := make(chan uint16)
 	go func(c gofast.Client, newAlloc chan<- uint16) {
 		r := c.NewRequest() // should be blocked before releaseID call
-		newAlloc <- r.GetID()
+		newAlloc <- r.ID
 	}(c, newAlloc)
 
 	select {

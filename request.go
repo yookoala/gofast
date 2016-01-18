@@ -8,8 +8,3 @@ type Request struct {
 	Stdin    []byte
 	KeepConn bool
 }
-
-// GetID implements Request interface
-func (r *Request) GetID() uint16 {
-	return r.ID
-}
