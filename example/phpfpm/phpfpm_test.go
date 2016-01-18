@@ -2,11 +2,15 @@ package phpfpm_test
 
 import (
 	"log"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path"
 	"regexp"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/go-ini/ini"
 
@@ -82,10 +86,11 @@ func genConfig(basePath string) (confPath, network, address string) {
 	}
 
 	confPath = path.Join(basePath, "etc", "phpfpm.conf")
+	pidfile := path.Join(basePath, "var", "phpfpm.pid")
 
 	cfg := ini.Empty()
 	cfg.NewSection("global")
-	cfg.Section("global").NewKey("pid", path.Join(basePath, "var", "phpfpm.pid"))
+	cfg.Section("global").NewKey("pid", pidfile)
 	cfg.Section("global").NewKey("error_log", path.Join(basePath, "var", "phpfpm.error_log"))
 	cfg.NewSection("www")
 	cfg.Section("www").NewKey("listen", listen)
@@ -115,21 +120,51 @@ func TestHandler(t *testing.T) {
 
 	confPath, network, address := genConfig(examplePath())
 	cmd := &exec.Cmd{
-		Path:   phpfpmPath,
-		Args:   append([]string{phpfpmPath}, "-y", confPath),
+		Path: phpfpmPath,
+		Args: append([]string{phpfpmPath},
+			"--fpm-config", confPath,
+			"-F",  // start foreground
+			"-n",  // no ini file
+			"-e"), // extended information
 		Stderr: os.Stderr, // for now
 	}
 
 	stdoutRead, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
+		return
+	}
+	defer stdoutRead.Close()
+
+	// start the command then wait to kill after test end
+	if err := cmd.Start(); err != nil {
+		t.Errorf("unexpected error %v", err)
+		return
 	}
 
-	cmd.Start()
-	defer stdoutRead.Close()
-	defer cmd.Process.Kill()
+	// sleep a bit and wait for the process start
+	time.Sleep(time.Millisecond * 500)
+	defer cmd.Process.Wait()
+	defer cmd.Process.Signal(os.Interrupt)
 
-	log.Printf("%#v %#v", network, address)
+	t.Logf("started php-fpm on process %#v", cmd.Process.Pid)
+	if err := cmd.Process.Signal(syscall.Signal(0)); err != nil {
+		t.Logf("process.Signal on pid %d returned: %v\n", cmd.Process.Pid, err)
+	}
+
+	// start the proxy handler
 	h := phpfpm.NewHandler(network, address)
-	_ = h
+
+	r, err := http.NewRequest("GET", "/", nil)
+	if err != nil {
+		log.Printf("unexpected error %v", err)
+	}
+	w := httptest.NewRecorder()
+
+	h.ServeHTTP(w, r)
+
+	// check results
+	if want, have := "", w.Body.String(); want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
 }

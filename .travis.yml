@@ -7,14 +7,5 @@ go:
   - 1.5
   - tip
 
-env:
-  matrix:
-  - TEST_PHPFPM_PATH=/usr/sbin/php5-fpm
-
-addons:
-  apt:
-    packages:
-    - php5-fpm
-
 script:
   - go test -v ./...
