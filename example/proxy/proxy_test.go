@@ -2,21 +2,24 @@ package proxy_test
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"net/http/fcgi"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/yookoala/gofast/example/proxy"
 )
 
-func app() (l net.Listener, err error) {
-	l, err = net.Listen("tcp", "127.0.0.1:9000")
+func app(network, address string) (l net.Listener, err error) {
+	l, err = net.Listen(network, address)
 	if err != nil {
 		return
 	}
 	handler := func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("in app")
 		fmt.Fprintf(w, "hello world")
 	}
 	go fcgi.Serve(l, http.HandlerFunc(handler))
@@ -24,10 +27,19 @@ func app() (l net.Listener, err error) {
 }
 
 func TestProxy(t *testing.T) {
-	l, err := app()
+	dir, err := os.Getwd()
 	if err != nil {
 		t.Errorf("unexpected error: %#v", err.Error())
 	}
+	sock := dir + "/test.sock"
+	log.Printf(sock)
+
+	l, err := app("unix", sock)
+	if err != nil {
+		t.Errorf("unexpected error: %#v", err.Error())
+	}
+	defer os.Remove(sock)
+	defer l.Close()
 
 	p := proxy.New(l.Addr().Network(), l.Addr().String())
 	w := httptest.NewRecorder()
@@ -37,7 +49,7 @@ func TestProxy(t *testing.T) {
 	}
 	p.ServeHTTP(w, r)
 
-	if want, have := "", w.Body.String(); want != have {
-		t.Errorf("expected %#v, got %#v", want, have)
+	if notWant, have := "", w.Body.String(); notWant == have {
+		t.Errorf("not expected %#v, got %#v", notWant, have)
 	}
 }

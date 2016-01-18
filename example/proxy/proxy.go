@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"log"
 	"net"
 	"net/http"
@@ -41,14 +42,49 @@ func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := gofast.NewClient(conn)
 	req := c.NewRequest()
 
-	// some input for req
+	// some required cgi parameters
+	req.Params["REQUEST_METHOD"] = r.Method
+	req.Params["SERVER_PROTOCOL"] = r.Proto
 
-	err = c.Handle(req)
+	/*
+		// FIXME: add these parameter automatically
+		// from net/cgi Handler.ServeHTTP
+		// should add later
+		"SERVER_SOFTWARE=go",
+		"SERVER_NAME=" + req.Host,
+		"SERVER_PROTOCOL=HTTP/1.1",
+		"HTTP_HOST=" + req.Host,
+		"GATEWAY_INTERFACE=CGI/1.1",
+		"REQUEST_METHOD=" + req.Method,
+		"QUERY_STRING=" + req.URL.RawQuery,
+		"REQUEST_URI=" + req.URL.RequestURI(),
+		"PATH_INFO=" + pathInfo,
+		"SCRIPT_NAME=" + root,
+		"SCRIPT_FILENAME=" + h.Path,
+		"SERVER_PORT=" + port,
+	*/
+
+	// some input for req
+	req.Params["hello"] = "world"
+	req.Params["foo"] = "bar"
+	req.Content = []byte("foo bar") // FIXME: somehow need content, find out why
+
+	// a buffer to read
+	wResp := new(bytes.Buffer)
+	wErr := new(bytes.Buffer)
+
+	// handl the result
+	err = c.Handle(wResp, wErr, req)
 	if err != nil {
 		http.Error(w, "failed to process request", http.StatusInternalServerError)
 		log.Printf("gofast: unable to process request "+
 			"(network=%#v, address=%#v, error=%#v)",
 			p.network, p.address, err.Error())
 		return
+	} else if wErr.Len() != 0 {
+		log.Printf("gofast: error stream from FastCGI application "+
+			"(network=%#v, address=%#v, error=%#v)",
+			p.network, p.address, wErr.String())
 	}
+	w.Write(wResp.Bytes())
 }
