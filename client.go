@@ -15,7 +15,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -214,33 +213,35 @@ func (pipes *ResponsePipe) Close() {
 }
 
 // WriteTo writes the given output into http.ResponseWriter
-func (pipes *ResponsePipe) WriteTo(rw http.ResponseWriter, ew io.Writer) {
+func (pipes *ResponsePipe) WriteTo(rw http.ResponseWriter, ew io.Writer) (err error) {
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
 	go func() {
 		defer wg.Done()
-		pipes.writeResponse(rw)
+		err = pipes.writeResponse(rw)
 	}()
 
 	go func() {
 		defer wg.Done()
-		pipes.writeError(ew)
+		err = pipes.writeError(ew)
 	}()
 
 	// blocks until all reads and writes are done
 	wg.Wait()
+	return
 }
 
-func (pipes *ResponsePipe) writeError(w io.Writer) {
-	_, err := io.Copy(w, pipes.stdErrReader)
+func (pipes *ResponsePipe) writeError(w io.Writer) (err error) {
+	_, err = io.Copy(w, pipes.stdErrReader)
 	if err != nil {
-		log.Printf("gofast: copy error: %v", err)
+		err = fmt.Errorf("gofast: copy error: %v", err.Error())
 	}
+	return
 }
 
 // writeTo writes the given output into http.ResponseWriter
-func (pipes *ResponsePipe) writeResponse(w http.ResponseWriter) {
+func (pipes *ResponsePipe) writeResponse(w http.ResponseWriter) (err error) {
 	linebody := bufio.NewReaderSize(pipes.stdOutReader, 1024)
 	headers := make(http.Header)
 	statusCode := 0
@@ -248,10 +249,12 @@ func (pipes *ResponsePipe) writeResponse(w http.ResponseWriter) {
 	sawBlankLine := false
 
 	for {
-		line, isPrefix, err := linebody.ReadLine()
+		var line []byte
+		var isPrefix bool
+		line, isPrefix, err = linebody.ReadLine()
 		if isPrefix {
 			w.WriteHeader(http.StatusInternalServerError)
-			log.Printf("gofast: long header line from subprocess.")
+			err = fmt.Errorf("gofast: long header line from subprocess")
 			return
 		}
 		if err == io.EOF {
@@ -259,7 +262,7 @@ func (pipes *ResponsePipe) writeResponse(w http.ResponseWriter) {
 		}
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			log.Printf("gofast: error reading headers: %v", err)
+			err = fmt.Errorf("gofast: error reading headers: %v", err)
 			return
 		}
 		if len(line) == 0 {
@@ -269,7 +272,7 @@ func (pipes *ResponsePipe) writeResponse(w http.ResponseWriter) {
 		headerLines++
 		parts := strings.SplitN(string(line), ":", 2)
 		if len(parts) < 2 {
-			log.Printf("gofast: bogus header line: %s", string(line))
+			err = fmt.Errorf("gofast: bogus header line: %s", string(line))
 			continue
 		}
 		header, val := parts[0], parts[1]
@@ -278,13 +281,14 @@ func (pipes *ResponsePipe) writeResponse(w http.ResponseWriter) {
 		switch {
 		case header == "Status":
 			if len(val) < 3 {
-				log.Printf("gofast: bogus status (short): %q", val)
+				err = fmt.Errorf("gofast: bogus status (short): %q", val)
 				return
 			}
-			code, err := strconv.Atoi(val[0:3])
+			var code int
+			code, err = strconv.Atoi(val[0:3])
 			if err != nil {
-				log.Printf("gofast: bogus status: %q", val)
-				log.Printf("gofast: line was %q", line)
+				err = fmt.Errorf("gofast: bogus status: %q\nline was %q",
+					val, line)
 				return
 			}
 			statusCode = code
@@ -294,7 +298,7 @@ func (pipes *ResponsePipe) writeResponse(w http.ResponseWriter) {
 	}
 	if headerLines == 0 || !sawBlankLine {
 		w.WriteHeader(http.StatusInternalServerError)
-		log.Printf("gofast: no headers")
+		err = fmt.Errorf("gofast: no headers")
 		return
 	}
 
@@ -312,7 +316,7 @@ func (pipes *ResponsePipe) writeResponse(w http.ResponseWriter) {
 
 	if statusCode == 0 && headers.Get("Content-Type") == "" {
 		w.WriteHeader(http.StatusInternalServerError)
-		log.Printf("gofast: missing required Content-Type in headers")
+		err = fmt.Errorf("gofast: missing required Content-Type in headers")
 		return
 	}
 
@@ -331,9 +335,9 @@ func (pipes *ResponsePipe) writeResponse(w http.ResponseWriter) {
 
 	w.WriteHeader(statusCode)
 
-	_, err := io.Copy(w, linebody)
+	_, err = io.Copy(w, linebody)
 	if err != nil {
-		log.Printf("gofast: copy error: %v", err)
+		err = fmt.Errorf("gofast: copy error: %v", err)
 	}
-
+	return
 }
