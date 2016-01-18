@@ -7,32 +7,51 @@ import (
 	"net/http"
 )
 
+// BeforeDo is the function to change FastCGI request before
+// the client do it
+type BeforeDo func(req *Request, r *http.Request) (*Request, error)
+
+// passthrough is the simplest BeforeDo implementation
+func passthrough(req *Request, r *http.Request) (*Request, error) {
+	return req, nil
+}
+
 // Handler is the interface for a FastCGI
 // web server, which proxy request to FastCGI
 // application through network port or socket
 type Handler interface {
 	SetLogger(logger *log.Logger)
+	SetBeforeDo(fn BeforeDo)
 	ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
 
 // NewHandler returns a new Handler interface
 func NewHandler(network, address string) Handler {
 	return &defaultHandler{
-		network: network,
-		address: address,
+		network:  network,
+		address:  address,
+		beforeDo: passthrough,
 	}
 }
 
 // defaultHandler implements Proxy interface
 type defaultHandler struct {
-	network string
-	address string
-	logger  *log.Logger
+	network  string
+	address  string
+	beforeDo BeforeDo
+	logger   *log.Logger
 }
 
 // SetLogger implements Handler
 func (h *defaultHandler) SetLogger(logger *log.Logger) {
 	h.logger = logger
+}
+
+// SetBeforeDo implements Handler
+func (h *defaultHandler) SetBeforeDo(beforeDo BeforeDo) {
+	if beforeDo != nil {
+		h.beforeDo = beforeDo
+	}
 }
 
 // ServeHTTP implements http.Handler
@@ -49,10 +68,6 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := NewClient(conn, 0)
 	req := c.NewRequest(r)
 
-	// some input for req
-	req.Params["hello"] = "world"
-	req.Params["foo"] = "bar"
-
 	// FIXME: Stdin should be a Reader / ReadCloser
 	//        instead of []byte.
 	//
@@ -61,6 +76,14 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//        instead of storing another copy of body
 	//        in memory
 	req.Stdin = []byte(r.Form.Encode())
+
+	req, err = h.beforeDo(req, r)
+	if err != nil {
+		log.Printf("gofast: stopped by beforeDo "+
+			"(network=%#v, address=%#v, error=%#v)",
+			h.network, h.address, err.Error())
+		return
+	}
 
 	// handle the result
 	resp, err := c.Do(req)

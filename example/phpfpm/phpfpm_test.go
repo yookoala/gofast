@@ -118,7 +118,8 @@ func TestHandler(t *testing.T) {
 		return
 	}
 
-	confPath, network, address := genConfig(examplePath())
+	exmpPath := examplePath()
+	confPath, network, address := genConfig(exmpPath)
 	cmd := &exec.Cmd{
 		Path: phpfpmPath,
 		Args: append([]string{phpfpmPath},
@@ -153,9 +154,11 @@ func TestHandler(t *testing.T) {
 	}
 
 	// start the proxy handler
-	h := phpfpm.NewHandler(network, address)
+	h := phpfpm.NewHandler(
+		path.Join(exmpPath, "htdocs"),
+		network, address)
 
-	r, err := http.NewRequest("GET", "/", nil)
+	r, err := http.NewRequest("GET", "/index.php", nil)
 	if err != nil {
 		log.Printf("unexpected error %v", err)
 	}
@@ -164,7 +167,7 @@ func TestHandler(t *testing.T) {
 	h.ServeHTTP(w, r)
 
 	// check results
-	if want, have := "", w.Body.String(); want != have {
+	if want, have := "hello index", w.Body.String(); want != have {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
 }
