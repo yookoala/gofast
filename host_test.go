@@ -1,34 +1,23 @@
-package proxy_test
+package gofast_test
 
 import (
 	"fmt"
-	"net"
 	"net/http"
-	"net/http/fcgi"
 	"net/http/httptest"
 	"os"
 	"testing"
 
-	"github.com/yookoala/gofast/example/proxy"
+	"github.com/yookoala/gofast"
 )
 
-func app(network, address string, fn http.HandlerFunc) (l net.Listener, err error) {
-	l, err = net.Listen(network, address)
-	if err != nil {
-		return
-	}
-	go fcgi.Serve(l, http.HandlerFunc(fn))
-	return
-}
-
-func TestProxy(t *testing.T) {
+func TestHandler(t *testing.T) {
 
 	// create temporary socket in the testing folder
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Errorf("unexpected error: %#v", err.Error())
 	}
-	sock := dir + "/example.proxy.sock"
+	sock := dir + "/test.handler.sock"
 
 	// create temporary fcgi application server
 	// that listens to the socket
@@ -36,7 +25,7 @@ func TestProxy(t *testing.T) {
 		t.Logf("accessing FastCGI process")
 		fmt.Fprintf(w, "hello world")
 	}
-	l, err := app("unix", sock, fn)
+	l, err := newApp("unix", sock, fn)
 	if err != nil {
 		t.Errorf("unexpected error: %#v", err.Error())
 	}
@@ -44,7 +33,7 @@ func TestProxy(t *testing.T) {
 	defer l.Close()
 
 	// deine a proxy that access the temp fcgi application server
-	p := proxy.New(l.Addr().Network(), l.Addr().String())
+	p := gofast.NewHandler(l.Addr().Network(), l.Addr().String())
 	w := httptest.NewRecorder()
 
 	// request the application server
