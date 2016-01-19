@@ -6,3 +6,12 @@ go:
   - 1.4
   - 1.5
   - tip
+
+addons:
+  apt:
+    packages:
+    - php5-fpm
+
+env:
+  global:
+  - TEST_PHPFPM_PATH=/usr/sbin/php5-fpm
