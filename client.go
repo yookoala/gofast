@@ -87,10 +87,10 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 		return
 	}
 
-	var rec record
-
 	// NOTE: all errors return before goroutine (readLoop)
 	go func() {
+		var rec record
+
 		defer c.ReleaseID(req.ID)
 		defer resp.Close()
 	readLoop:
