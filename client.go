@@ -15,7 +15,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
@@ -58,18 +57,6 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
 	resp = NewResponsePipe()
 
-	// read all from stdin and determine the content length
-	stdin := []byte{}
-	if req.Stdin != nil {
-		stdin, err = ioutil.ReadAll(req.Stdin)
-		if err != nil {
-			return
-		}
-		req.Params["CONTENT_LENGTH"] = fmt.Sprintf("%d", len(stdin))
-	} else {
-		req.Params["CONTENT_LENGTH"] = ""
-	}
-
 	// FIXME: add other role implementation, add role field to Request
 	err = c.conn.writeBeginRequest(req.ID, uint16(roleResponder), 0)
 	if err != nil {
@@ -81,7 +68,25 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 		resp.Close()
 		return
 	}
-	err = c.conn.writeRecord(typeStdin, req.ID, stdin)
+	if req.Stdin == nil {
+		err = c.conn.writeRecord(typeStdin, req.ID, []byte{})
+	} else {
+		p := make([]byte, 1024)
+		for {
+			_, err = req.Stdin.Read(p)
+			if err == io.EOF {
+				err = nil
+				break
+			} else if err != nil {
+				break
+			}
+			err = c.conn.writeRecord(typeStdin, req.ID, p)
+			if err != nil {
+				break
+			}
+		}
+	}
+
 	if err != nil {
 		resp.Close()
 		return
