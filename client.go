@@ -15,6 +15,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
@@ -27,7 +28,7 @@ import (
 type Request struct {
 	ID       uint16
 	Params   map[string]string
-	Stdin    []byte
+	Stdin    io.Reader
 	KeepConn bool
 }
 
@@ -57,6 +58,18 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
 	resp = NewResponsePipe()
 
+	// read all from stdin and determine the content length
+	stdin := []byte{}
+	if req.Stdin != nil {
+		stdin, err = ioutil.ReadAll(req.Stdin)
+		if err != nil {
+			return
+		}
+		req.Params["CONTENT_LENGTH"] = fmt.Sprintf("%d", len(stdin))
+	} else {
+		req.Params["CONTENT_LENGTH"] = "0"
+	}
+
 	// FIXME: add other role implementation, add role field to Request
 	err = c.conn.writeBeginRequest(req.ID, uint16(roleResponder), 0)
 	if err != nil {
@@ -68,7 +81,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 		resp.Close()
 		return
 	}
-	err = c.conn.writeRecord(typeStdin, req.ID, req.Stdin)
+	err = c.conn.writeRecord(typeStdin, req.ID, stdin)
 	if err != nil {
 		resp.Close()
 		return
@@ -117,26 +130,27 @@ func (c *client) NewRequest(r *http.Request) (req *Request) {
 
 	// define some required cgi parameters
 	// with the given http request
+	req.Params["SERVER_SOFTWARE"] = "go"
+	req.Params["SERVER_NAME"] = r.Host
+	req.Params["SERVER_PROTOCOL"] = "HTTP/1.1"
+	req.Params["HTTP_HOST"] = r.Host
+	req.Params["GATEWAY_INTERFACE"] = "CGI/1.1"
 	req.Params["REQUEST_METHOD"] = r.Method
-	req.Params["SERVER_PROTOCOL"] = r.Proto
+	req.Params["QUERY_STRING"] = r.URL.RawQuery
+	req.Params["REQUEST_URI"] = r.URL.RequestURI()
 
 	/*
 		// FIXME: add these parameter automatically
 		// from net/cgi Handler.ServeHTTP
 		// should add later
-		"SERVER_SOFTWARE=go",
-		"SERVER_NAME=" + req.Host,
-		"SERVER_PROTOCOL=HTTP/1.1",
-		"HTTP_HOST=" + req.Host,
-		"GATEWAY_INTERFACE=CGI/1.1",
-		"REQUEST_METHOD=" + req.Method,
-		"QUERY_STRING=" + req.URL.RawQuery,
-		"REQUEST_URI=" + req.URL.RequestURI(),
 		"PATH_INFO=" + pathInfo,
 		"SCRIPT_NAME=" + root,
 		"SCRIPT_FILENAME=" + h.Path,
 		"SERVER_PORT=" + port,
 	*/
+
+	// pass body (io.ReadCloser) to stdio
+	req.Stdin = r.Body
 
 	return
 }

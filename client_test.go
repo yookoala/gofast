@@ -144,8 +144,6 @@ func TestClient_StdErr(t *testing.T) {
 		req.Params["REQUEST_METHOD"] = ""
 		req.Params["SERVER_PROTOCOL"] = ""
 
-		req.Stdin = []byte(r.Form.Encode())
-
 		// handle the result
 		resp, err := c.Do(req)
 		if err != nil {

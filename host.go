@@ -68,15 +68,6 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := NewClient(conn, 0)
 	req := c.NewRequest(r)
 
-	// FIXME: Stdin should be a Reader / ReadCloser
-	//        instead of []byte.
-	//
-	//        Pass the r.Body (ReadCloser) to
-	//        modified version of writeRecord
-	//        instead of storing another copy of body
-	//        in memory
-	req.Stdin = []byte(r.Form.Encode())
-
 	req, err = h.beforeDo(req, r)
 	if err != nil {
 		log.Printf("gofast: stopped by beforeDo "+
