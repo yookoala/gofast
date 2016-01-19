@@ -120,13 +120,24 @@ func TestHandler(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
 
+	formPrefix := "<!DOCTYPE html>\n<html>\n<head>\n  <title>Simple Form"
+
 	w, err = get("/form.php")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 		return
 	}
-	if want, have := "<!DOCTYPE html>\n<form", w.Body.String(); strings.HasPrefix(have, want) {
-		t.Errorf("expected to start with %#v, got %s", want, have)
+	if want, have := formPrefix, w.Body.String(); !strings.HasPrefix(have, want) {
+		t.Errorf("expected to start with %#v, got %#v", want, have)
+	}
+
+	w, err = get("/form.php?hello=world")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+		return
+	}
+	if want, have := "$_GET = array (\n  'hello' => 'world',\n)", w.Body.String(); want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
 	}
 
 }
