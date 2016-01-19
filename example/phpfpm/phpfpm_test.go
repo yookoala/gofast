@@ -1,6 +1,7 @@
 package phpfpm_test
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -103,14 +104,12 @@ func TestHandler(t *testing.T) {
 		return
 	}
 
-	post := func(path string, form *url.Values) (w *httptest.ResponseRecorder, err error) {
+	post := func(path string, payload string) (w *httptest.ResponseRecorder, err error) {
 		var reader io.Reader
-		if form != nil {
-			reader = strings.NewReader(form.Encode())
-		}
+		reader = strings.NewReader(payload)
 		r, err := http.NewRequest("POST", path, reader)
-
 		r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		r.Header.Add("Content-Length", fmt.Sprintf("%d", len(payload)))
 		if err != nil {
 			return
 		}
@@ -159,7 +158,7 @@ func TestHandler(t *testing.T) {
 
 	form := url.Values{}
 	form.Add("text_input", "hello world")
-	w, err = post("/form.php", &form)
+	w, err = post("/form.php", form.Encode())
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 		return

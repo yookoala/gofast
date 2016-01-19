@@ -139,10 +139,12 @@ func (c *client) NewRequest(r *http.Request) (req *Request) {
 	req.Params["QUERY_STRING"] = r.URL.RawQuery
 	req.Params["REQUEST_URI"] = r.URL.RequestURI()
 
-	// some optional but important header to pass on
 	// FIXME: find a way to pass on all header
 	//        without risking client to override
 	//        important Params above
+
+	// header parameters essential for POST reqeuests
+	req.Params["CONTENT_LENGTH"] = r.Header.Get("Content-Length")
 	req.Params["CONTENT_TYPE"] = r.Header.Get("Content-Type")
 
 	/*
