@@ -1,8 +1,10 @@
 package phpfpm_test
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -101,6 +103,22 @@ func TestHandler(t *testing.T) {
 		return
 	}
 
+	post := func(path string, form *url.Values) (w *httptest.ResponseRecorder, err error) {
+		var reader io.Reader
+		if form != nil {
+			reader = strings.NewReader(form.Encode())
+		}
+		r, err := http.NewRequest("POST", path, reader)
+
+		r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		if err != nil {
+			return
+		}
+		w = httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return
+	}
+
 	// check results
 	w, err := get("/")
 	if err != nil {
@@ -120,15 +138,14 @@ func TestHandler(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
 
-	formPrefix := "<!DOCTYPE html>\n<html>\n<head>\n  <title>Simple Form"
-
 	w, err = get("/form.php")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 		return
 	}
-	if want, have := formPrefix, w.Body.String(); !strings.HasPrefix(have, want) {
-		t.Errorf("expected to start with %#v, got %#v", want, have)
+	formPrefix := "<!DOCTYPE html>\n<html>\n<head>\n  <title>Simple Form"
+	if have := w.Body.String(); !strings.HasPrefix(have, formPrefix) {
+		t.Errorf("expected to start with %#v, got %#v", formPrefix, have)
 	}
 
 	w, err = get("/form.php?hello=world")
@@ -137,6 +154,17 @@ func TestHandler(t *testing.T) {
 		return
 	}
 	if want, have := "$_GET = array (\n  'hello' => 'world',\n)", w.Body.String(); want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+
+	form := url.Values{}
+	form.Add("text_input", "hello world")
+	w, err = post("/form.php", &form)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+		return
+	}
+	if want, have := "$_POST = array (\n  'text_input' => 'hello world',\n)", w.Body.String(); want != have {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
 
