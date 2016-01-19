@@ -52,10 +52,8 @@ func (c *client) ReleaseID(reqID uint16) {
 	}()
 }
 
-// Do implements Client.Do
-func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
-
-	resp = NewResponsePipe()
+// writeRequest writes params and stdin to the FastCGI application
+func (c *client) writeRequest(resp *ResponsePipe, req *Request) (err error) {
 
 	// FIXME: add other role implementation, add role field to Request
 	err = c.conn.writeBeginRequest(req.ID, uint16(roleResponder), 0)
@@ -89,35 +87,52 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
 	if err != nil {
 		resp.Close()
+	}
+	return
+}
+
+// readResponse read the FastCGI stdout and stderr, then write
+// to the response pipe
+func (c *client) readResponse(resp *ResponsePipe, req *Request) {
+	var rec record
+
+	defer c.ReleaseID(req.ID)
+	defer resp.Close()
+readLoop:
+	for {
+		if err := rec.read(c.conn.rwc); err != nil {
+			break
+		}
+
+		// different output type for different stream
+		switch rec.h.Type {
+		case typeStdout:
+			resp.stdOutWriter.Write(rec.content())
+		case typeStderr:
+			resp.stdErrWriter.Write(rec.content())
+		case typeEndRequest:
+			break readLoop
+		default:
+			panic(fmt.Sprintf("unexpected type %#v in readLoop", rec.h.Type))
+		}
+	}
+}
+
+// Do implements Client.Do
+func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
+
+	resp = NewResponsePipe()
+
+	// FIXME: Should run read and write in parallel.
+	//        Specification never said "write before read".
+	//        Current workflow may block.
+
+	if err = c.writeRequest(resp, req); err != nil {
 		return
 	}
 
-	// NOTE: all errors return before goroutine (readLoop)
-	go func() {
-		var rec record
-
-		defer c.ReleaseID(req.ID)
-		defer resp.Close()
-	readLoop:
-		for {
-			if err := rec.read(c.conn.rwc); err != nil {
-				break
-			}
-
-			// different output type for different stream
-			switch rec.h.Type {
-			case typeStdout:
-				resp.stdOutWriter.Write(rec.content())
-			case typeStderr:
-				resp.stdErrWriter.Write(rec.content())
-			case typeEndRequest:
-				break readLoop
-			default:
-				panic(fmt.Sprintf("unexpected type %#v in readLoop", rec.h.Type))
-			}
-		}
-	}()
-
+	// NOTE: all errors return before readResponse
+	go c.readResponse(resp, req)
 	return
 }
 
