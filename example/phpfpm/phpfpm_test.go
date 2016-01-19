@@ -1,11 +1,11 @@
 package phpfpm_test
 
 import (
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"github.com/yookoala/gophpfpm"
@@ -91,16 +91,42 @@ func TestHandler(t *testing.T) {
 		path.Join(exmpPath, "htdocs"),
 		network, address)
 
-	r, err := http.NewRequest("GET", "/index.php", nil)
-	if err != nil {
-		log.Printf("unexpected error %v", err)
+	get := func(path string) (w *httptest.ResponseRecorder, err error) {
+		r, err := http.NewRequest("GET", path, nil)
+		if err != nil {
+			return
+		}
+		w = httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return
 	}
-	w := httptest.NewRecorder()
-
-	h.ServeHTTP(w, r)
 
 	// check results
+	w, err := get("/")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+		return
+	}
 	if want, have := "hello index", w.Body.String(); want != have {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
+
+	w, err = get("/index.php")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+		return
+	}
+	if want, have := "hello index", w.Body.String(); want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+
+	w, err = get("/form.php")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+		return
+	}
+	if want, have := "<!DOCTYPE html>\n<form", w.Body.String(); strings.HasPrefix(have, want) {
+		t.Errorf("expected to start with %#v, got %s", want, have)
+	}
+
 }
