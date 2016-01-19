@@ -67,7 +67,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 		}
 		req.Params["CONTENT_LENGTH"] = fmt.Sprintf("%d", len(stdin))
 	} else {
-		req.Params["CONTENT_LENGTH"] = "0"
+		req.Params["CONTENT_LENGTH"] = ""
 	}
 
 	// FIXME: add other role implementation, add role field to Request
