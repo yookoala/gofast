@@ -1,8 +1,6 @@
-gofast
-======
+# gofast [![GoDoc](https://godoc.org/github.com/yookoala/gofast?status.svg)][godoc] [![Travis CI results][travis]](https://travis-ci.org/yookoala/gofast)
 
-[![Travis CI results][travis]](https://travis-ci.org/yookoala/gofast)
-
+[godoc]: https://godoc.org/github.com/yookoala/gofast
 [travis]: https://api.travis-ci.org/yookoala/gofast.svg?branch=master
 
 
