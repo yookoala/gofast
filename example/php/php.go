@@ -1,4 +1,4 @@
-package phpfpm
+package php
 
 import (
 	"net/http"

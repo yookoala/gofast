@@ -1,4 +1,4 @@
-package phpfpm_test
+package php_test
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 
 	"github.com/yookoala/gophpfpm"
 
-	"github.com/yookoala/gofast/example/phpfpm"
+	"github.com/yookoala/gofast/example/php"
 )
 
 var username, phpfpmPath, phpfpmListen string
@@ -90,7 +90,7 @@ func TestHandler(t *testing.T) {
 
 	// start the proxy handler
 	network, address := process.Address()
-	h := phpfpm.NewHandler(
+	h := php.NewHandler(
 		path.Join(exmpPath, "htdocs"),
 		network, address)
 
