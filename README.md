@@ -1,23 +1,36 @@
-# gofast [![GoDoc](https://godoc.org/github.com/yookoala/gofast?status.svg)][godoc] [![Travis CI results][travis]](https://travis-ci.org/yookoala/gofast)
+# gofast [![GoDoc](https://godoc.org/github.com/yookoala/gofast?status.svg)][godoc] [![Travis CI results][travis]](https://travis-ci.org/yookoala/gofast?branch=master)
 
 [godoc]: https://godoc.org/github.com/yookoala/gofast
 [travis]: https://api.travis-ci.org/yookoala/gofast.svg?branch=master
 
 
 **gofast** is a [FastCGI](http://www.fastcgi.com/devkit/doc/fcgi-spec.html)
-client library written purely in go.
+"client" library written purely in go.
 
+
+What does it do, really?
+------------------------
+
+In FastCGI specification, a FastCGI system has 2 components: (a) web
+server; and (b) application server. A web server should hand over
+request information to the application server through socket. The
+application server always listens to the socket and response to
+socket request accordingly.
+
+```
+visitor → web server → application server → web server → visitor
+```
+
+**gofast** help you to write the code on the web server part of this
+picture. It helps you to pass the request to application server and
+receive response from it.
 
 Why?
 ----
 Many popular languages (e.g. [Python][python/webservers],
 [PHP][php-fpm], [Ruby][rubygem/fcgi]) has FastCGI server
-implementations. Developer used to proxy Nginx or Apache requests
-to these FastCGI backend. What if go developers can use these
-languages through the same protocol?
-
-Some quick and dirty RPC could be handy with the help of all the
-other languages support FastCGI. The only limit is your imagination.
+implementations. With **gofast**, you may mix the languages
+without too much complication.
 
 Also, this is fun to do :-)
 
