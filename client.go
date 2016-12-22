@@ -17,6 +17,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,12 +29,13 @@ import (
 type Request struct {
 	ID       uint16
 	Params   map[string]string
-	Stdin    io.Reader
+	Stdin    io.ReadCloser
 	KeepConn bool
 }
 
 // client is the default implementation of Client
 type client struct {
+	root   string
 	conn   *conn
 	chanID chan uint16
 }
@@ -69,16 +72,20 @@ func (c *client) writeRequest(resp *ResponsePipe, req *Request) (err error) {
 	if req.Stdin == nil {
 		err = c.conn.writeRecord(typeStdin, req.ID, []byte{})
 	} else {
+		defer req.Stdin.Close()
 		p := make([]byte, 1024)
 		for {
-			_, err = req.Stdin.Read(p)
+			count, err := req.Stdin.Read(p)
 			if err == io.EOF {
 				err = nil
-				break
 			} else if err != nil {
 				break
 			}
-			err = c.conn.writeRecord(typeStdin, req.ID, p)
+			if count == 0 {
+				break
+			}
+
+			err = c.conn.writeRecord(typeStdin, req.ID, p[:count])
 			if err != nil {
 				break
 			}
@@ -150,32 +157,90 @@ func (c *client) NewRequest(r *http.Request) (req *Request) {
 
 	// define some required cgi parameters
 	// with the given http request
-	req.Params["SERVER_SOFTWARE"] = "go"
-	req.Params["SERVER_NAME"] = r.Host
-	req.Params["SERVER_PROTOCOL"] = "HTTP/1.1"
-	req.Params["HTTP_HOST"] = r.Host
-	req.Params["GATEWAY_INTERFACE"] = "CGI/1.1"
-	req.Params["REQUEST_METHOD"] = r.Method
+
+	// refer from nginx fastcgi_params
+	// fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;
+	// fastcgi_split_path_info ^(.+\.php)(/?.+)$;
+	// fastcgi_param PATH_INFO $fastcgi_path_info;
+	// fastcgi_param PATH_TRANSLATED $document_root$fastcgi_path_info;
+	// fastcgi_param  QUERY_STRING       $query_string;
+	// fastcgi_param  REQUEST_METHOD     $request_method;
+	// fastcgi_param  CONTENT_TYPE       $content_type;
+	// fastcgi_param  CONTENT_LENGTH     $content_length;
+	// fastcgi_param  SCRIPT_NAME        $fastcgi_script_name;
+	// fastcgi_param  REQUEST_URI        $request_uri;
+	// fastcgi_param  DOCUMENT_URI       $document_uri;
+	// fastcgi_param  DOCUMENT_ROOT      $document_root;
+	// fastcgi_param  SERVER_PROTOCOL    $server_protocol;
+	// fastcgi_param  HTTPS              $https if_not_empty;
+	// fastcgi_param  GATEWAY_INTERFACE  CGI/1.1;
+	// fastcgi_param  SERVER_SOFTWARE    nginx/$nginx_version;
+	// fastcgi_param  REMOTE_ADDR        $remote_addr;
+	// fastcgi_param  REMOTE_PORT        $remote_port;
+	// fastcgi_param  SERVER_ADDR        $server_addr;
+	// fastcgi_param  SERVER_PORT        $server_port;
+	// fastcgi_param  SERVER_NAME        $server_name;
+	// # PHP only, required if PHP was built with --enable-force-cgi-redirect
+	// fastcgi_param  REDIRECT_STATUS    200;
+
+	fastcgiScriptName := r.URL.Path
+
+	var fastcgiPathInfo string
+	pathinfoRe := regexp.MustCompile(`^(.+\.php)(/?.+)$`)
+	if matches := pathinfoRe.FindStringSubmatch(fastcgiScriptName); len(matches) > 0 {
+		fastcgiScriptName, fastcgiPathInfo = matches[1], matches[2]
+	}
+	var isHttps string
+	if r.URL.Scheme == "https" || r.URL.Scheme == "wss" {
+		isHttps = "on"
+	}
+
+	remoteAddr, remotePort, _ := net.SplitHostPort(r.RemoteAddr)
+	_, serverPort, err := net.SplitHostPort(r.URL.Host)
+	if err != nil {
+		if r.URL.Scheme == "https" || r.URL.Scheme == "wss" {
+			serverPort = "443"
+		} else {
+			serverPort = "80"
+		}
+	}
+
+	req.Params["SCRIPT_FILENAME"] = filepath.Join(c.root, fastcgiScriptName)
+	req.Params["PATH_INFO"] = fastcgiPathInfo
+	req.Params["PATH_TRANSLATED"] = filepath.Join(c.root, fastcgiPathInfo)
 	req.Params["QUERY_STRING"] = r.URL.RawQuery
-	req.Params["REQUEST_URI"] = r.URL.RequestURI()
-
-	// FIXME: find a way to pass on all header
-	//        without risking client to override
-	//        important Params above
-
-	// header parameters essential for POST reqeuests
-	req.Params["CONTENT_LENGTH"] = r.Header.Get("Content-Length")
+	req.Params["REQUEST_METHOD"] = r.Method
 	req.Params["CONTENT_TYPE"] = r.Header.Get("Content-Type")
+	req.Params["CONTENT_LENGTH"] = r.Header.Get("Content-Length")
+	req.Params["SCRIPT_NAME"] = fastcgiScriptName
+	req.Params["REQUEST_URI"] = r.RequestURI
+	req.Params["DOCUMENT_URI"] = r.URL.Path
+	req.Params["DOCUMENT_ROOT"] = c.root
+	req.Params["SERVER_PROTOCOL"] = r.Proto
+	req.Params["HTTPS"] = isHttps
+	req.Params["GATEWAY_INTERFACE"] = "CGI/1.1"
+	req.Params["SERVER_SOFTWARE"] = "appnode"
+	req.Params["REMOTE_ADDR"] = remoteAddr
+	req.Params["REMOTE_PORT"] = remotePort
+	// req.Params["SERVER_ADDR"] = ""
+	req.Params["SERVER_PORT"] = serverPort
+	req.Params["SERVER_NAME"] = r.Host
+	req.Params["REDIRECT_STATUS"] = "200"
 
-	/*
-		// FIXME: add these parameter automatically
-		// from net/cgi Handler.ServeHTTP
-		// should add later
-		"PATH_INFO=" + pathInfo,
-		"SCRIPT_NAME=" + root,
-		"SCRIPT_FILENAME=" + h.Path,
-		"SERVER_PORT=" + port,
-	*/
+	// http header
+	for k, v := range r.Header {
+		formattedKey := strings.Replace(strings.ToUpper(k), "-", "_", -1)
+		if formattedKey == "CONTENT_TYPE" || formattedKey == "CONTENT_LENGTH" {
+			continue
+		}
+
+		key := "HTTP_" + formattedKey
+		var value string
+		if len(v) > 0 {
+			value = v[0]
+		}
+		req.Params[key] = value
+	}
 
 	// pass body (io.ReadCloser) to stdio
 	req.Stdin = r.Body
@@ -212,7 +277,7 @@ type Client interface {
 // available for 16bit request id (65536).
 // Default 0.
 //
-func NewClient(conn net.Conn, limit uint32) Client {
+func NewClient(root string, conn net.Conn, limit uint32) Client {
 	cid := make(chan uint16)
 
 	if limit == 0 || limit > 65536 {
@@ -226,6 +291,7 @@ func NewClient(conn net.Conn, limit uint32) Client {
 	}(uint16(limit - 1))
 
 	return &client{
+		root:   root,
 		conn:   newConn(conn),
 		chanID: cid,
 	}
