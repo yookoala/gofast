@@ -4,8 +4,10 @@
 [travis]: https://api.travis-ci.org/yookoala/gofast.svg?branch=master
 
 
-**gofast** is a [FastCGI](http://www.fastcgi.com/devkit/doc/fcgi-spec.html)
+**gofast** is a [FastCGI][fastcgi]
 "client" library written purely in go.
+
+[fastcgi]: http://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
 
 
 What does it do, really?
