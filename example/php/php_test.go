@@ -66,8 +66,7 @@ func examplePath() string {
 func TestHandler(t *testing.T) {
 
 	if phpfpmPath == "" {
-		t.Logf("empty TEST_PHPFPM_PATH, skip test")
-		return
+		t.Skip("empty TEST_PHPFPM_PATH, skip test")
 	}
 	if stat, err := os.Stat(phpfpmPath); os.IsNotExist(err) {
 		t.Errorf("TEST_PHPFPM_PATH (%#v) not found", phpfpmPath)
