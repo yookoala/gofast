@@ -33,7 +33,7 @@ func TestClient_NewRequest(t *testing.T) {
 
 	t.Logf("default limit: %d", 65535)
 
-	c := gofast.NewClient(nil, 0)
+	c := gofast.NewClient("", nil, 0)
 
 	for i := uint32(0); i <= 65535; i++ {
 		r := c.NewRequest(nil)
@@ -78,7 +78,7 @@ func TestClient_NewRequestWithLimit(t *testing.T) {
 	limit := uint32(rand.Int31n(100) + 10)
 	t.Logf("random limit: %d", limit)
 
-	c := gofast.NewClient(nil, limit)
+	c := gofast.NewClient("", nil, limit)
 
 	for i := uint32(0); i < limit; i++ {
 		r := c.NewRequest(nil)
@@ -137,7 +137,7 @@ func TestClient_StdErr(t *testing.T) {
 			return
 		}
 
-		c := gofast.NewClient(conn, 0)
+		c := gofast.NewClient("", conn, 0)
 		req := c.NewRequest(nil)
 
 		// Some required paramters with invalid values

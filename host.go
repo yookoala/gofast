@@ -26,8 +26,9 @@ type Handler interface {
 }
 
 // NewHandler returns a new Handler interface
-func NewHandler(network, address string) Handler {
+func NewHandler(root, network, address string) Handler {
 	return &defaultHandler{
+		root:     root,
 		network:  network,
 		address:  address,
 		beforeDo: passthrough,
@@ -36,6 +37,7 @@ func NewHandler(network, address string) Handler {
 
 // defaultHandler implements Proxy interface
 type defaultHandler struct {
+	root     string
 	network  string
 	address  string
 	beforeDo BeforeDo
@@ -65,7 +67,7 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c := NewClient(conn, 0)
+	c := NewClient(h.root, conn, 0)
 	req := c.NewRequest(r)
 
 	req, err = h.beforeDo(req, r)
