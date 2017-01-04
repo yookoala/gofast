@@ -74,8 +74,9 @@ func (c *client) writeRequest(resp *ResponsePipe, req *Request) (err error) {
 	} else {
 		defer req.Stdin.Close()
 		p := make([]byte, 1024)
+		var count int
 		for {
-			count, err := req.Stdin.Read(p)
+			count, err = req.Stdin.Read(p)
 			if err == io.EOF {
 				err = nil
 			} else if err != nil {
@@ -190,9 +191,9 @@ func (c *client) NewRequest(r *http.Request) (req *Request) {
 	if matches := pathinfoRe.FindStringSubmatch(fastcgiScriptName); len(matches) > 0 {
 		fastcgiScriptName, fastcgiPathInfo = matches[1], matches[2]
 	}
-	var isHttps string
+	var isHTTPS string
 	if r.URL.Scheme == "https" || r.URL.Scheme == "wss" {
-		isHttps = "on"
+		isHTTPS = "on"
 	}
 
 	remoteAddr, remotePort, _ := net.SplitHostPort(r.RemoteAddr)
@@ -217,7 +218,7 @@ func (c *client) NewRequest(r *http.Request) (req *Request) {
 	req.Params["DOCUMENT_URI"] = r.URL.Path
 	req.Params["DOCUMENT_ROOT"] = c.root
 	req.Params["SERVER_PROTOCOL"] = r.Proto
-	req.Params["HTTPS"] = isHttps
+	req.Params["HTTPS"] = isHTTPS
 	req.Params["GATEWAY_INTERFACE"] = "CGI/1.1"
 	req.Params["SERVER_SOFTWARE"] = "appnode"
 	req.Params["REMOTE_ADDR"] = remoteAddr
