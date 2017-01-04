@@ -382,7 +382,7 @@ func (pipes *ResponsePipe) writeResponse(w http.ResponseWriter) (err error) {
 		parts := strings.SplitN(string(line), ":", 2)
 		if len(parts) < 2 {
 			err = fmt.Errorf("gofast: bogus header line: %s", string(line))
-			continue
+			return
 		}
 		header, val := parts[0], parts[1]
 		header = strings.TrimSpace(header)
