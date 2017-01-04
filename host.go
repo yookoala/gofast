@@ -7,10 +7,6 @@ import (
 	"net/http"
 )
 
-// BeforeDo is the function to change FastCGI request before
-// the client do it
-type BeforeDo func(req *Request, r *http.Request) (*Request, error)
-
 // Handler is the interface for a FastCGI
 // web server, which proxy request to FastCGI
 // application through network port or socket
