@@ -7,15 +7,20 @@ import (
 	"net/http"
 )
 
-// Handler is the interface for a FastCGI
-// web server, which proxy request to FastCGI
-// application through network port or socket
+// Handler is implements http.Handler and provide logger changing method.
 type Handler interface {
+	http.Handler
 	SetLogger(logger *log.Logger)
-	ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
 
-// NewHandler returns a new Handler interface
+// NewHandler returns the default Handler implementation. This default Handler
+// act as the "web server" component in fastcgi specification, which connects
+// fastcgi "application" through the network/address and passthrough I/O as
+// specified.
+//
+// An extra Middleware (if nil, will be ignored) can be provided to modify
+// the *Request or rewrite the response stream.
+//
 func NewHandler(middleware Middleware, network, address string) Handler {
 	sessionHandler := BasicSession
 	if middleware != nil {
@@ -28,7 +33,7 @@ func NewHandler(middleware Middleware, network, address string) Handler {
 	}
 }
 
-// defaultHandler implements Proxy interface
+// defaultHandler implements Handler
 type defaultHandler struct {
 	sessionHandler SessionHandler
 	network        string
@@ -43,6 +48,8 @@ func (h *defaultHandler) SetLogger(logger *log.Logger) {
 
 // ServeHTTP implements http.Handler
 func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	// TODO: separate dial logic to pool client / connection
 	conn, err := net.Dial(h.network, h.address)
 	if err != nil {
 		http.Error(w, "failed to connect to FastCGI application", http.StatusBadGateway)
@@ -51,8 +58,6 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.network, h.address, err.Error())
 		return
 	}
-
-	// TODO: reuse client for multiple connections (?)
 	c := NewClient(conn, 0)
 
 	// handle the session

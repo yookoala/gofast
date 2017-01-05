@@ -23,6 +23,11 @@ socket request accordingly.
 visitor → web server → application server → web server → visitor
 ```
 
+In ordinary Apache + php-fpm hosting environment, this would be:
+```
+visitor → Apache → php-fpm → Apache → visitor
+```
+
 **gofast** help you to write the code on the web server part of this
 picture. It helps you to pass the request to application server and
 receive response from it.
