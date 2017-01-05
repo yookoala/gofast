@@ -13,11 +13,6 @@ import (
 // Should do proper routing or other parameter mapping here.
 type SessionHandler func(client Client, req *Request) (resp *ResponsePipe, err error)
 
-// Handle combines a
-func (handler SessionHandler) Handle(client Client, req *Request) (*ResponsePipe, error) {
-	return handler(client, req)
-}
-
 // Middleware transform a SessionHandler as another SessionHandler. The
 // middlewares provided by this library helps to map fastcgi parameters
 // according to the need of different application.
@@ -129,7 +124,7 @@ func BasicParamsMap(inner SessionHandler) SessionHandler {
 		req.Params["REQUEST_URI"] = r.RequestURI
 		req.Params["QUERY_STRING"] = r.URL.RawQuery
 
-		return inner.Handle(client, req)
+		return inner(client, req)
 	}
 }
 
@@ -191,7 +186,7 @@ func (fs *FileSystemRouter) Router() Middleware {
 			}
 			req.Params["SCRIPT_FILENAME"] = path.Join(fs.DocRoot, urlPath)
 
-			return inner.Handle(client, req)
+			return inner(client, req)
 		}
 	}
 }
@@ -232,7 +227,7 @@ func MapHeader(inner SessionHandler) SessionHandler {
 			req.Params[key] = value
 		}
 
-		return inner.Handle(client, req)
+		return inner(client, req)
 	}
 }
 
@@ -258,7 +253,7 @@ func MapEndpoint(endpointFile string) Middleware {
 			req.Params["SCRIPT_FILENAME"] = endpointFile
 			req.Params["DOCUMENT_URI"] = r.URL.Path
 			req.Params["DOCUMENT_ROOT"] = dir
-			return inner.Handle(client, req)
+			return inner(client, req)
 		}
 	}
 }
