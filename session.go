@@ -182,7 +182,17 @@ func MapHeader(inner SessionHandler) SessionHandler {
 			key := "HTTP_" + formattedKey
 			var value string
 			if len(v) > 0 {
-				value = v[0]
+				//   refer to https://tools.ietf.org/html/rfc7230#section-3.2.2
+				//
+				//   A recipient MAY combine multiple header fields with the same field
+				//   name into one "field-name: field-value" pair, without changing the
+				//   semantics of the message, by appending each subsequent field value to
+				//   the combined field value in order, separated by a comma.  The order
+				//   in which header fields with the same field name are received is
+				//   therefore significant to the interpretation of the combined field
+				//   value; a proxy MUST NOT change the order of these field values when
+				//   forwarding a message.
+				value = strings.Join(v, ",")
 			}
 			req.Params[key] = value
 		}
