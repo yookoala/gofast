@@ -16,7 +16,11 @@ type Handler interface {
 }
 
 // NewHandler returns a new Handler interface
-func NewHandler(sessionHandler SessionHandler, network, address string) Handler {
+func NewHandler(middleware Middleware, network, address string) Handler {
+	sessionHandler := BasicSession
+	if middleware != nil {
+		sessionHandler = middleware(sessionHandler)
+	}
 	return &defaultHandler{
 		sessionHandler: sessionHandler,
 		network:        network,

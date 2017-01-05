@@ -208,25 +208,24 @@ func MapHeader(inner SessionHandler) SessionHandler {
 	}
 }
 
-// NewPHPFS returns a SessionHandler provides a classic PHP hosting
+// NewPHPFS returns a Session Middleware that prepare a classic PHP hosting
 // environment for a HTTP session
-func NewPHPFS(root string) SessionHandler {
+func NewPHPFS(root string) Middleware {
 	fs := &FileSystemRouter{
 		DocRoot:  root,
 		Exts:     []string{"php"},
 		DirIndex: []string{"index.php"},
 	}
-	middleware := Chain(
+	return Chain(
 		BasicParamsMap,
 		MapHeader,
 		fs.Router(),
 	)
-	return middleware(BasicSession)
 }
 
-// NewFileEndpoint returns a SessionHandler provides a PHP hosting
+// NewFileEndpoint returns a Session Middleware that prepares a PHP hosting
 // environment for single entry point applications (e.g. Laravel)
-func NewFileEndpoint(endpointFile string) SessionHandler {
+func NewFileEndpoint(endpointFile string) Middleware {
 	dir, webpath := filepath.Dir(endpointFile), "/"+filepath.Base(endpointFile)
 	endpointRoutes := func(inner SessionHandler) SessionHandler {
 		return func(client Client, req *Request) (*ResponsePipe, error) {
@@ -239,10 +238,9 @@ func NewFileEndpoint(endpointFile string) SessionHandler {
 			return inner.Handle(client, req)
 		}
 	}
-	middleware := Chain(
+	return Chain(
 		BasicParamsMap,
 		MapHeader,
 		endpointRoutes,
 	)
-	return middleware(BasicSession)
 }
