@@ -40,6 +40,23 @@ Also, this is fun to do :-)
 [rubygem/fcgi]: https://rubygems.org/gems/fcgi/versions/0.9.2.1
 [python/webservers]: https://docs.python.org/2/howto/webservers.html
 
+How to Use?
+-----------
+You basically would use the `Handler` as [http.Handler]. You can further mux it
+with [default ServeMux][http.NewServeMux] or other compatible routers. You then
+serve your fastcgi within this golang http server.
+
+Please see the example usage in this repository:
+
+* [PHP]
+* [Python3]
+
+[http.Handler]: https://golang.org/pkg/net/http/#Handler
+[mux]: https://golang.org/pkg/net/http/#ServeMux
+[http.NewServeMux]: https://golang.org/pkg/net/http/#NewServeMux
+[PHP]: example/php
+[Python3]: example/python3
+
 Author
 ------
 

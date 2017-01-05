@@ -223,3 +223,26 @@ func NewPHPFS(root string) SessionHandler {
 	)
 	return middleware(BasicSession)
 }
+
+// NewFileEndpoint returns a SessionHandler provides a PHP hosting
+// environment for single entry point applications (e.g. Laravel)
+func NewFileEndpoint(endpointFile string) SessionHandler {
+	dir, webpath := filepath.Dir(endpointFile), "/"+filepath.Base(endpointFile)
+	endpointRoutes := func(inner SessionHandler) SessionHandler {
+		return func(client Client, req *Request) (*ResponsePipe, error) {
+			r := req.Raw
+			req.Params["REQUEST_URI"] = webpath + r.URL.RequestURI()
+			req.Params["SCRIPT_NAME"] = webpath
+			req.Params["SCRIPT_FILENAME"] = endpointFile
+			req.Params["DOCUMENT_URI"] = r.URL.Path
+			req.Params["DOCUMENT_ROOT"] = dir
+			return inner.Handle(client, req)
+		}
+	}
+	middleware := Chain(
+		BasicParamsMap,
+		MapHeader,
+		endpointRoutes,
+	)
+	return middleware(BasicSession)
+}
