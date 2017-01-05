@@ -37,41 +37,48 @@ func Chain(middlewares ...Middleware) Middleware {
 
 // BasicSession implements SessionHandlerFunc
 func BasicSession(client Client, req *Request) (*ResponsePipe, error) {
-
-	r := req.Raw
-
-	var isHTTPS string
-	if r.URL.Scheme == "https" || r.URL.Scheme == "wss" {
-		isHTTPS = "on"
-	}
-
-	remoteAddr, remotePort, _ := net.SplitHostPort(r.RemoteAddr)
-	_, serverPort, err := net.SplitHostPort(r.URL.Host)
-	if err != nil {
-		if r.URL.Scheme == "https" || r.URL.Scheme == "wss" {
-			serverPort = "443"
-		} else {
-			serverPort = "80"
-		}
-	}
-
-	// the basic information here
-	req.Params["CONTENT_TYPE"] = r.Header.Get("Content-Type")
-	req.Params["CONTENT_LENGTH"] = r.Header.Get("Content-Length")
-	req.Params["HTTPS"] = isHTTPS
-	req.Params["GATEWAY_INTERFACE"] = "CGI/1.1"
-	req.Params["REMOTE_ADDR"] = remoteAddr
-	req.Params["REMOTE_PORT"] = remotePort
-	req.Params["SERVER_PORT"] = serverPort
-	req.Params["SERVER_NAME"] = r.Host
-	req.Params["SERVER_PROTOCOL"] = r.Proto
-	req.Params["SERVER_SOFTWARE"] = "gofast"
-	req.Params["REDIRECT_STATUS"] = "200"
-	req.Params["REQUEST_METHOD"] = r.Method
-	req.Params["REQUEST_URI"] = r.RequestURI
-	req.Params["QUERY_STRING"] = r.URL.RawQuery
-
 	return client.Do(req)
+}
+
+// BasicParamsMap maps basic parameters
+func BasicParamsMap(inner SessionHandler) SessionHandler {
+	return func(client Client, req *Request) (*ResponsePipe, error) {
+
+		r := req.Raw
+
+		var isHTTPS string
+		if r.URL.Scheme == "https" || r.URL.Scheme == "wss" {
+			isHTTPS = "on"
+		}
+
+		remoteAddr, remotePort, _ := net.SplitHostPort(r.RemoteAddr)
+		_, serverPort, err := net.SplitHostPort(r.URL.Host)
+		if err != nil {
+			if r.URL.Scheme == "https" || r.URL.Scheme == "wss" {
+				serverPort = "443"
+			} else {
+				serverPort = "80"
+			}
+		}
+
+		// the basic information here
+		req.Params["CONTENT_TYPE"] = r.Header.Get("Content-Type")
+		req.Params["CONTENT_LENGTH"] = r.Header.Get("Content-Length")
+		req.Params["HTTPS"] = isHTTPS
+		req.Params["GATEWAY_INTERFACE"] = "CGI/1.1"
+		req.Params["REMOTE_ADDR"] = remoteAddr
+		req.Params["REMOTE_PORT"] = remotePort
+		req.Params["SERVER_PORT"] = serverPort
+		req.Params["SERVER_NAME"] = r.Host
+		req.Params["SERVER_PROTOCOL"] = r.Proto
+		req.Params["SERVER_SOFTWARE"] = "gofast"
+		req.Params["REDIRECT_STATUS"] = "200"
+		req.Params["REQUEST_METHOD"] = r.Method
+		req.Params["REQUEST_URI"] = r.RequestURI
+		req.Params["QUERY_STRING"] = r.URL.RawQuery
+
+		return inner.Handle(client, req)
+	}
 }
 
 // FileSystemRouter handles ordinary filesystem based router
@@ -210,8 +217,9 @@ func NewPHPFS(root string) SessionHandler {
 		DirIndex: []string{"index.php"},
 	}
 	middleware := Chain(
-		fs.Router(),
+		BasicParamsMap,
 		MapHeader,
+		fs.Router(),
 	)
 	return middleware(BasicSession)
 }
