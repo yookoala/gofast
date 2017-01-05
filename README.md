@@ -10,8 +10,7 @@
 [fastcgi]: http://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
 
 
-What does it do, really?
-------------------------
+## What does it do, really?
 
 In FastCGI specification, a FastCGI system has 2 components: (a) web
 server; and (b) application server. A web server should hand over
@@ -45,33 +44,77 @@ Also, this is fun to do :-)
 [rubygem/fcgi]: https://rubygems.org/gems/fcgi/versions/0.9.2.1
 [python/webservers]: https://docs.python.org/2/howto/webservers.html
 
-How to Use?
------------
+
+## How to Use?
+
 You basically would use the `Handler` as [http.Handler]. You can further mux it
 with [default ServeMux][http.NewServeMux] or other compatible routers. You then
 serve your fastcgi within this golang http server.
 
-Please see the example usage in this repository:
+[http.Handler]: https://golang.org/pkg/net/http/#Handler
+[mux]: https://golang.org/pkg/net/http/#ServeMux
+[http.NewServeMux]: https://golang.org/pkg/net/http/#NewServeMux
+
+### Simple Example
+
+Please note that this is only the **web server** component. You need to start
+your **application** component elsewhere.
+
+```go
+// this is a very simple fastcgi web server
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"os"
+
+	"github.com/yookoala/gofast"
+)
+
+// NewHandler returns a fastcgi web server implementation as an http.Handler
+func NewHandler(root, network, address string) http.Handler {
+	h := gofast.NewHandler(gofast.NewPHPFS(root), network, address)
+	return h
+}
+
+func main() {
+	// get fastcgi address from env FASTCGI_ADDR
+	fcgiAddr := os.Getenv("FASTCGI_ADDR")
+
+	// handles static assets in the assets folder
+	http.Handle("/assets/",
+		http.StripPrefix("/assets/",
+			http.FileSystem(http.Dir("/var/www/html/assets"))))
+
+	// handle all scripts in document root
+	http.Handle("/", NewHandler("/var/www/html", "tcp", fcgiAddr))
+
+	// serve at 8080 port
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+```
+
+### Full Examples
+
+Please see the example usages:
 
 * [PHP]
 * [Python3]
 
-[http.Handler]: https://golang.org/pkg/net/http/#Handler
-[mux]: https://golang.org/pkg/net/http/#ServeMux
-[http.NewServeMux]: https://golang.org/pkg/net/http/#NewServeMux
 [PHP]: example/php
 [Python3]: example/python3
 
-Author
-------
+
+### Author
 
 This library is written by [Koala Yeung][author@github].
 
 [author@github]: https://github.com/yookoala/
 
 
-Contirbuting
-------------
+## Contirbuting
 
 Your are welcome to contribute to this library.
 
@@ -88,8 +131,8 @@ To fix an existing bug or implement a new feature, please:
 [issue tracker]: https://github.com/yookoala/gofast/issues
 [pull requests]: https://github.com/yookoala/gofast/pulls
 
-Licence
--------
+
+## Licence
 
 This library is release under a BSD-like licence. Please find the
 [LICENCE][LICENCE] file in this repository

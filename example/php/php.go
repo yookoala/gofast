@@ -6,8 +6,16 @@ import (
 	"github.com/yookoala/gofast"
 )
 
-// NewHandler returns a new FastCGI handler
-func NewHandler(root, network, address string) http.Handler {
-	h := gofast.NewHandler(gofast.NewPHPFS(root), network, address)
+// NewHandler returns a fastcgi web server implementation as an http.Handler
+// Please note that this handler doesn't handle the fastcgi application process.
+// You'd need to start it with other means.
+//
+// docroot: the document root of the PHP site.
+// network: network protocol (tcp / tcp4 / tcp6)
+//          or if it is a unix socket, "unix"
+// address: IP address and port, or the socket physical address of the fastcgi
+//          application.
+func NewHandler(docroot, network, address string) http.Handler {
+	h := gofast.NewHandler(gofast.NewPHPFS(docroot), network, address)
 	return h
 }
