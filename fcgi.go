@@ -4,7 +4,7 @@
 
 // Package gofast implements the FastCGI protocol.
 // Currently only the responder role is supported.
-// The protocol is defined at http://www.fastcgi.com/drupal/node/22
+// The protocol is defined at http://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
 package gofast
 
 // This file defines the raw protocol and some utilities used by the child and

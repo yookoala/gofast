@@ -4,7 +4,7 @@
 // license that can be found in the LICENSE file.
 
 // This file implements the web server side for FastCGI
-// as specified in http://www.fastcgi.com/drupal/node/22
+// as specified in http://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
 
 // A part of this file is from golang package net/http/cgi,
 // in particular https://golang.org/src/net/http/cgi/host.go
