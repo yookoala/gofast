@@ -114,7 +114,7 @@ This library is written by [Koala Yeung][author@github].
 [author@github]: https://github.com/yookoala/
 
 
-## Contirbuting
+## Contributing
 
 Your are welcome to contribute to this library.
 
