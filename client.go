@@ -22,10 +22,21 @@ import (
 	"strings"
 )
 
+// Role for fastcgi application in spec
+type Role uint16
+
+// Roles specified in the fastcgi spec
+const (
+	RoleResponder Role = iota + 1
+	RoleAuthorizer
+	RoleFilter
+)
+
 // Request hold information of a standard
 // FastCGI request
 type Request struct {
 	Raw      *http.Request
+	Role     Role
 	ID       uint16
 	Params   map[string]string
 	Stdin    io.ReadCloser
@@ -56,8 +67,8 @@ func (c *client) ReleaseID(reqID uint16) {
 // writeRequest writes params and stdin to the FastCGI application
 func (c *client) writeRequest(resp *ResponsePipe, req *Request) (err error) {
 
-	// FIXME: add other role implementation, add role field to Request
-	err = c.conn.writeBeginRequest(req.ID, uint16(roleResponder), 0)
+	// write request header with specified role
+	err = c.conn.writeBeginRequest(req.ID, req.Role, 0)
 	if err != nil {
 		resp.Close()
 		return
@@ -189,6 +200,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 func (c *client) NewRequest(r *http.Request) (req *Request) {
 	req = &Request{
 		Raw:    r,
+		Role:   RoleResponder,
 		ID:     c.AllocID(),
 		Params: make(map[string]string),
 	}
