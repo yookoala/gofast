@@ -3,7 +3,6 @@ package gofast
 import (
 	"bytes"
 	"log"
-	"net"
 	"net/http"
 )
 
@@ -28,16 +27,17 @@ func NewHandler(middleware Middleware, network, address string) Handler {
 	}
 	return &defaultHandler{
 		sessionHandler: sessionHandler,
-		network:        network,
-		address:        address,
+		newClient: SimpleClientFactory(
+			SimpleConnFactory(network, address),
+			0,
+		),
 	}
 }
 
 // defaultHandler implements Handler
 type defaultHandler struct {
 	sessionHandler SessionHandler
-	network        string
-	address        string
+	newClient      ClientFactory
 	logger         *log.Logger
 }
 
@@ -50,32 +50,28 @@ func (h *defaultHandler) SetLogger(logger *log.Logger) {
 func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// TODO: separate dial logic to pool client / connection
-	conn, err := net.Dial(h.network, h.address)
+	c, err := h.newClient()
 	if err != nil {
 		http.Error(w, "failed to connect to FastCGI application", http.StatusBadGateway)
-		log.Printf("gofast: unable to connect to FastCGI application "+
-			"(network=%#v, address=%#v, error=%#v)",
-			h.network, h.address, err.Error())
+		log.Printf("gofast: unable to connect to FastCGI application. %s",
+			err.Error())
 		return
 	}
-	c := NewClient(conn, 0)
 
 	// handle the session
 	resp, err := h.sessionHandler(c, c.NewRequest(r))
 	if err != nil {
 		http.Error(w, "failed to process request", http.StatusInternalServerError)
-		log.Printf("gofast: unable to process request "+
-			"(network=%#v, address=%#v, error=%#v)",
-			h.network, h.address, err.Error())
+		log.Printf("gofast: unable to process request %s",
+			err.Error())
 		return
 	}
 	errBuffer := new(bytes.Buffer)
 	resp.WriteTo(w, errBuffer)
 
 	if errBuffer.Len() > 0 {
-		log.Printf("gofast: error stream from application process "+
-			"(network=%#v, address=%#v, error=%#v)",
-			h.network, h.address, errBuffer.String())
+		log.Printf("gofast: error stream from application process %s",
+			errBuffer.String())
 		return
 	}
 }

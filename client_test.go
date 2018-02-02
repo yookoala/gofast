@@ -33,7 +33,10 @@ func TestClient_NewRequest(t *testing.T) {
 
 	t.Logf("default limit: %d", 65535)
 
-	c := gofast.NewClient(nil, 0)
+	c, _ := gofast.SimpleClientFactory(
+		func() (net.Conn, error) { return nil, nil }, // dummy conn factory
+		0,
+	)()
 
 	for i := uint32(0); i <= 65535; i++ {
 		r := c.NewRequest(nil)
@@ -78,7 +81,10 @@ func TestClient_NewRequestWithLimit(t *testing.T) {
 	limit := uint32(rand.Int31n(100) + 10)
 	t.Logf("random limit: %d", limit)
 
-	c := gofast.NewClient(nil, limit)
+	c, _ := gofast.SimpleClientFactory(
+		func() (net.Conn, error) { return nil, nil }, // dummy conn factory
+		limit,
+	)()
 
 	for i := uint32(0); i < limit; i++ {
 		r := c.NewRequest(nil)
@@ -132,7 +138,10 @@ func TestClient_StdErr(t *testing.T) {
 
 	// ServeHTTP implements http.Handler
 	ServeHTTP := func(p *proxy, w http.ResponseWriter, r *http.Request) (errStr string) {
-		conn, err := net.Dial(p.network, p.address)
+		c, err := gofast.SimpleClientFactory(
+			gofast.SimpleConnFactory(p.network, p.address),
+			0,
+		)()
 		if err != nil {
 			http.Error(w, "failed to connect to FastCGI application", http.StatusBadGateway)
 			log.Printf("gofast: unable to connect to FastCGI application "+
@@ -140,8 +149,6 @@ func TestClient_StdErr(t *testing.T) {
 				p.network, p.address, err.Error())
 			return
 		}
-
-		c := gofast.NewClient(conn, 0)
 		req := c.NewRequest(nil)
 
 		// Some required paramters with invalid values
