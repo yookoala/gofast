@@ -19,7 +19,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 // Request hold information of a standard
@@ -234,21 +233,21 @@ func (pipes *ResponsePipe) Close() {
 
 // WriteTo writes the given output into http.ResponseWriter
 func (pipes *ResponsePipe) WriteTo(rw http.ResponseWriter, ew io.Writer) (err error) {
-	wg := new(sync.WaitGroup)
-	wg.Add(2)
+	chErr := make(chan error, 2)
 
 	go func() {
-		defer wg.Done()
-		err = pipes.writeResponse(rw)
+		chErr <- pipes.writeResponse(rw)
 	}()
-
 	go func() {
-		defer wg.Done()
-		err = pipes.writeError(ew)
+		chErr <- pipes.writeError(ew)
 	}()
 
-	// blocks until all reads and writes are done
-	wg.Wait()
+	for i := 0; i < 2; i++ {
+		if err = <-chErr; err != nil {
+			close(chErr)
+			return
+		}
+	}
 	return
 }
 
