@@ -74,4 +74,11 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			errBuffer.String())
 		return
 	}
+
+	// signal to close the client
+	// or the pool to return the client
+	if err = c.Close(); err != nil {
+		log.Printf("gofast: error closeing client: %s",
+			err.Error())
+	}
 }

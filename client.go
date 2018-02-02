@@ -146,6 +146,12 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 	resp = NewResponsePipe()
 	readError, writeError := make(chan error), make(chan error)
 
+	// check if connection exists
+	if c.conn == nil {
+		err = fmt.Errorf("client connection has been closed")
+		return
+	}
+
 	// if there is a raw request, use the context deadline
 	var ctx context.Context
 	if req.Raw != nil {
@@ -199,6 +205,18 @@ func (c *client) NewRequest(r *http.Request) (req *Request) {
 	return
 }
 
+// Close implements Client.Close
+// If the inner connection has been closed before,
+// this method would do nothing and return nil
+func (c *client) Close() (err error) {
+	if c.conn == nil {
+		return
+	}
+	err = c.conn.Close()
+	c.conn = nil
+	return
+}
+
 // Client is a client interface of FastCGI
 // application process through given
 // connection (net.Conn)
@@ -218,6 +236,9 @@ type Client interface {
 	// ReleaseID releases a reqID.
 	// It never blocks.
 	ReleaseID(uint16)
+
+	// Close the underlying connection
+	Close() error
 }
 
 // ConnFactory creates new network connections
