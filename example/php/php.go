@@ -2,6 +2,7 @@ package php
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/yookoala/gofast"
 )
@@ -17,9 +18,14 @@ import (
 //          application.
 func NewHandler(docroot, network, address string) http.Handler {
 	connFactory := gofast.SimpleConnFactory(network, address)
+	pool := gofast.NewClientPool(
+		gofast.SimpleClientFactory(connFactory, 0),
+		10,
+		60*time.Second,
+	)
 	h := gofast.NewHandler(
 		gofast.NewPHPFS(docroot),
-		gofast.SimpleClientFactory(connFactory, 0),
+		pool.CreateClient,
 	)
 	return h
 }

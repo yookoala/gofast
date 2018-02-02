@@ -2,6 +2,7 @@ package python3
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/yookoala/gofast"
 )
@@ -18,9 +19,14 @@ import (
 //          application.
 func NewHandler(entrypoint, network, address string) http.Handler {
 	connFactory := gofast.SimpleConnFactory(network, address)
+	pool := gofast.NewClientPool(
+		gofast.SimpleClientFactory(connFactory, 0),
+		10,
+		60*time.Second,
+	)
 	h := gofast.NewHandler(
 		gofast.NewFileEndpoint(entrypoint),
-		gofast.SimpleClientFactory(connFactory, 0),
+		pool.CreateClient,
 	)
 	return h
 }

@@ -74,7 +74,11 @@ import (
 
 // NewHandler returns a fastcgi web server implementation as an http.Handler
 func NewHandler(root, network, address string) http.Handler {
-	h := gofast.NewHandler(gofast.NewPHPFS(root), network, address)
+	connFactory := gofast.SimpleConnFactory(network, address)
+	h := gofast.NewHandler(
+		gofast.NewPHPFS(root),
+		gofast.SimpleClientFactory(connFactory, 0),
+	)
 	return h
 }
 
@@ -95,6 +99,59 @@ func main() {
 }
 
 ```
+
+### Pooling
+
+```go
+// this is a very simple fastcgi web server
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"os"
+
+	"github.com/yookoala/gofast"
+)
+
+// NewHandler returns a fastcgi web server implementation as an http.Handler
+func NewHandler(root, network, address string) http.Handler {
+
+	// generates http connections
+	connFactory := gofast.SimpleConnFactory(network, address)
+
+	// extra pooling layer
+	pool := gofast.NewClientPool(
+		gofast.SimpleClientFactory(connFactory, 0),
+		10, // buffer size for pre-created client-connection
+		30*time.Second, // life span of a client before expire
+	)
+	h := gofast.NewHandler(
+		gofast.NewPHPFS(root),
+		pool.CreateClient,
+
+	)
+	return h
+}
+
+func main() {
+	// get fastcgi address from env FASTCGI_ADDR
+	fcgiAddr := os.Getenv("FASTCGI_ADDR")
+
+	// handles static assets in the assets folder
+	http.Handle("/assets/",
+		http.StripPrefix("/assets/",
+			http.FileSystem(http.Dir("/var/www/html/assets"))))
+
+	// handle all scripts in document root
+	http.Handle("/", NewHandler("/var/www/html", "tcp", fcgiAddr))
+
+	// serve at 8080 port
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+```
+
 
 ### Full Examples
 
