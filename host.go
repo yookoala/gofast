@@ -20,17 +20,14 @@ type Handler interface {
 // An extra Middleware (if nil, will be ignored) can be provided to modify
 // the *Request or rewrite the response stream.
 //
-func NewHandler(middleware Middleware, network, address string) Handler {
+func NewHandler(middleware Middleware, clientFactory ClientFactory) Handler {
 	sessionHandler := BasicSession
 	if middleware != nil {
 		sessionHandler = middleware(sessionHandler)
 	}
 	return &defaultHandler{
 		sessionHandler: sessionHandler,
-		newClient: SimpleClientFactory(
-			SimpleConnFactory(network, address),
-			0,
-		),
+		newClient:      clientFactory,
 	}
 }
 

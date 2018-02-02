@@ -180,7 +180,7 @@ func TestClientPool_CreateClient_Return_0(t *testing.T) {
 		total := atomic.LoadUint64(&counter)
 		t.Logf("returned client got reused with %d concurrent connections",
 			total)
-	case <-time.After(time.Millisecond):
+	case <-time.After(10 * time.Millisecond):
 		t.Errorf("client is not reused")
 	}
 }
@@ -232,7 +232,7 @@ func TestClientPool_CreateClient_Return_40(t *testing.T) {
 		total := atomic.LoadUint64(&counter)
 		t.Logf("returned client got reused with %d concurrent connections",
 			total)
-	case <-time.After(time.Millisecond):
+	case <-time.After(10 * time.Millisecond):
 		t.Errorf("client is not reused")
 	}
 }
