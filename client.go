@@ -16,7 +16,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -287,7 +286,6 @@ func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
 		// Ref: https://fast-cgi.github.io/spec#33-records
 		requestID := make(chan uint16)
 		go func(maxID uint16) {
-			log.Printf("run requestID loop")
 			for i := uint16(0); i < maxID; i++ {
 				requestID <- i
 			}
