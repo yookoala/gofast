@@ -128,25 +128,39 @@ readLoop:
 func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
 	resp = NewResponsePipe()
-	ch := make(chan error)
+	writeError := make(chan error)
+
+	// if there is a raw request, use the context deadline
+	var deadline time.Time
+	var hasDeadline bool
+	if req.Raw != nil {
+		deadline, hasDeadline = req.Raw.Context().Deadline()
+	}
 
 	// Run read and write in parallel.
 	// Note: Specification never said "write before read".
 	go func() {
-		if err = c.writeRequest(resp, req); err != nil {
-			ch <- err
-		}
-		close(ch)
+		writeError <- c.writeRequest(resp, req)
+		close(writeError)
 	}()
 
 	// get response in a goroutine and send to response pipe
 	go c.readResponse(resp, req)
 
+	// if has no deadline, wait until ch is unblocked
+	if !hasDeadline {
+		// simply block until error is sent to writeError or
+		// writeError is closed
+		err = <-writeError
+		return
+	}
+
+	// wait until context deadline
+	// or until writeError is not blocked.
 	select {
-	case <-time.After(600 * time.Second):
-		// FIXME: need a way to configure the write timeout
-		err = fmt.Errorf("timeout after 600 seconds of writing request")
-	case err = <-ch:
+	case <-time.After(time.Until(deadline)):
+		err = fmt.Errorf("timeout on context deadline")
+	case err = <-writeError:
 		// do nothing
 	}
 	return
