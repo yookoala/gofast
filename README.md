@@ -34,15 +34,15 @@ receive response from it.
 Why?
 ----
 Many popular languages (e.g. [Python][python/webservers],
-[PHP][php-fpm], [Ruby][rubygem/fcgi]) has FastCGI server
+[PHP][php-fpm], [nodejs][node-fastcgi]) has FastCGI server
 implementations. With **gofast**, you may mix the languages
 without too much complication.
 
 Also, this is fun to do :-)
 
 [php-fpm]: http://php.net/manual/en/install.fpm.php
-[rubygem/fcgi]: https://rubygems.org/gems/fcgi/versions/0.9.2.1
-[python/webservers]: https://docs.python.org/2/howto/webservers.html
+[python/webservers]: https://docs.python.org/3.1/howto/webservers.html
+[node-fastcgi]: https://www.npmjs.com/package/node-fastcgi
 
 
 ## How to Use?
@@ -102,9 +102,11 @@ Please see the example usages:
 
 * [PHP]
 * [Python3]
+* [nodejs]
 
 [PHP]: example/php
 [Python3]: example/python3
+[nodejs]: example/nodejs
 
 
 ### Author
