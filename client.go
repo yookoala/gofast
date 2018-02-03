@@ -110,7 +110,7 @@ func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Requ
 
 	// define timeout
 	if deadline, ok := ctx.Deadline(); ok {
-		timeout = time.After(time.Until(deadline))
+		timeout = time.After(deadline.Sub(time.Now()))
 	} else {
 		timeout = never
 	}
@@ -166,7 +166,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 		ctx = req.Raw.Context()
 		// if has no deadline, wait until ch is unblocked
 		if deadline, ok := ctx.Deadline(); ok {
-			timeout = time.After(time.Until(deadline))
+			timeout = time.After(deadline.Sub(time.Now()))
 		}
 	} else {
 		ctx = context.TODO()
