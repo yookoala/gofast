@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Request hold information of a standard
@@ -127,17 +128,27 @@ readLoop:
 func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
 	resp = NewResponsePipe()
+	ch := make(chan error)
 
-	// FIXME: Should run read and write in parallel.
-	//        Specification never said "write before read".
-	//        Current workflow may block.
+	// Run read and write in parallel.
+	// Note: Specification never said "write before read".
+	go func() {
+		if err = c.writeRequest(resp, req); err != nil {
+			ch <- err
+		}
+		close(ch)
+	}()
 
-	if err = c.writeRequest(resp, req); err != nil {
-		return
-	}
-
-	// NOTE: all errors return before readResponse
+	// get response in a goroutine and send to response pipe
 	go c.readResponse(resp, req)
+
+	select {
+	case <-time.After(600 * time.Second):
+		// FIXME: need a way to configure the write timeout
+		err = fmt.Errorf("timeout after 600 seconds of writing request")
+	case err = <-ch:
+		// do nothing
+	}
 	return
 }
 
