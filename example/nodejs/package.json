@@ -1,0 +1,12 @@
+{
+  "name": "gofast-example",
+  "version": "1.0.0",
+  "description": "An example node-fastcgi app to test with gofast-based webserver.",
+  "main": "src/index.js",
+  "repository": "https://github.com/yookoala/gofast",
+  "author": "Koala Yeung <koalay@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "node-fastcgi": "^1.3.2"
+  }
+}
