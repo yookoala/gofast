@@ -13,6 +13,7 @@ package gofast
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -98,46 +99,83 @@ func (c *client) writeRequest(resp *ResponsePipe, req *Request) (err error) {
 
 // readResponse read the FastCGI stdout and stderr, then write
 // to the response pipe
-func (c *client) readResponse(resp *ResponsePipe, req *Request) {
+func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Request) (err error) {
+
 	var rec record
+	readError := make(chan error)
 
 	defer c.ReleaseID(req.ID)
 	defer resp.Close()
-readLoop:
-	for {
-		if err := rec.read(c.conn.rwc); err != nil {
-			break
-		}
 
-		// different output type for different stream
-		switch rec.h.Type {
-		case typeStdout:
-			resp.stdOutWriter.Write(rec.content())
-		case typeStderr:
-			resp.stdErrWriter.Write(rec.content())
-		case typeEndRequest:
-			break readLoop
-		default:
-			panic(fmt.Sprintf("unexpected type %#v in readLoop", rec.h.Type))
+	// readloop in goroutine
+	go func() {
+	readLoop:
+		for {
+			if err := rec.read(c.conn.rwc); err != nil {
+				break
+			}
+
+			// different output type for different stream
+			switch rec.h.Type {
+			case typeStdout:
+				resp.stdOutWriter.Write(rec.content())
+			case typeStderr:
+				resp.stdErrWriter.Write(rec.content())
+			case typeEndRequest:
+				break readLoop
+			default:
+				readError <- fmt.Errorf("unexpected type %#v in readLoop", rec.h.Type)
+			}
 		}
+		close(readError)
+	}()
+
+	select {
+	case <-ctx.Done():
+		err = fmt.Errorf("timeout or canceled by context")
+	case err = <-readError:
+		// do nothing and return the error
 	}
+	return
 }
 
 // Do implements Client.Do
 func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
 	resp = NewResponsePipe()
+	readError, writeError := make(chan error), make(chan error)
 
-	// FIXME: Should run read and write in parallel.
-	//        Specification never said "write before read".
-	//        Current workflow may block.
-
-	if err = c.writeRequest(resp, req); err != nil {
-		return
+	// if there is a raw request, use the context deadline
+	var ctx context.Context
+	if req.Raw != nil {
+		ctx = req.Raw.Context()
+	} else {
+		ctx = context.TODO()
 	}
 
-	// NOTE: all errors return before readResponse
-	go c.readResponse(resp, req)
+	// Run read and write in parallel.
+	// Note: Specification never said "write before read".
+	go func() {
+		readError <- c.writeRequest(resp, req)
+		close(readError)
+	}()
+
+	// get response in a goroutine and send to response pipe
+	go func() {
+		writeError <- c.readResponse(ctx, resp, req)
+		close(writeError)
+	}()
+
+	// wait until context deadline
+	// or until writeError is not blocked.
+	select {
+	case <-ctx.Done():
+		err = fmt.Errorf("timeout or canceled by context")
+	case err = <-readError:
+		// do nothing and return the error
+	case err = <-writeError:
+		// do nothing and return the error
+	}
 	return
 }
 

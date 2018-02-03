@@ -118,6 +118,10 @@ func TestClient_NewRequestWithLimit(t *testing.T) {
 	}
 }
 
+func TestClient_canceled(t *testing.T) {
+
+}
+
 func TestClient_StdErr(t *testing.T) {
 
 	// proxy implements Proxy interface
