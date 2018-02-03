@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Request hold information of a standard
@@ -103,17 +102,7 @@ func (c *client) writeRequest(resp *ResponsePipe, req *Request) (err error) {
 func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Request) (err error) {
 
 	var rec record
-	var timeout <-chan time.Time
 	readError := make(chan error)
-	never := make(chan time.Time) // always block
-	defer close(never)
-
-	// define timeout
-	if deadline, ok := ctx.Deadline(); ok {
-		timeout = time.After(deadline.Sub(time.Now()))
-	} else {
-		timeout = never
-	}
 
 	defer c.ReleaseID(req.ID)
 	defer resp.Close()
@@ -142,9 +131,10 @@ func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Requ
 	}()
 
 	select {
+	case <-ctx.Done():
+		err = fmt.Errorf("timeout or canceled by context")
 	case err = <-readError:
-	case <-timeout:
-		err = fmt.Errorf("timeout")
+		// do nothing and return the error
 	}
 	return
 }
@@ -153,21 +143,12 @@ func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Requ
 func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
 	resp = NewResponsePipe()
-	var timeout <-chan time.Time
-
 	readError, writeError := make(chan error), make(chan error)
-	never := make(chan time.Time) // always block
-	timeout = never
-	defer close(never)
 
 	// if there is a raw request, use the context deadline
 	var ctx context.Context
 	if req.Raw != nil {
 		ctx = req.Raw.Context()
-		// if has no deadline, wait until ch is unblocked
-		if deadline, ok := ctx.Deadline(); ok {
-			timeout = time.After(deadline.Sub(time.Now()))
-		}
 	} else {
 		ctx = context.TODO()
 	}
@@ -188,8 +169,8 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 	// wait until context deadline
 	// or until writeError is not blocked.
 	select {
-	case <-timeout:
-		err = fmt.Errorf("timeout on context deadline")
+	case <-ctx.Done():
+		err = fmt.Errorf("timeout or canceled by context")
 	case err = <-readError:
 		// do nothing and return the error
 	case err = <-writeError:
