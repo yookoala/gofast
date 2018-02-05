@@ -72,27 +72,18 @@ import (
 	"github.com/yookoala/gofast"
 )
 
-// NewHandler returns a fastcgi web server implementation as an http.Handler
-func NewHandler(root, network, address string) http.Handler {
-	connFactory := gofast.SimpleConnFactory(network, address)
-	h := gofast.NewHandler(
-		gofast.NewPHPFS(root),
-		gofast.SimpleClientFactory(connFactory, 0),
-	)
-	return h
-}
-
 func main() {
-	// get fastcgi address from env FASTCGI_ADDR
-	fcgiAddr := os.Getenv("FASTCGI_ADDR")
+	// Get fastcgi application server tcp address
+	// from env FASTCGI_ADDR. Then configure
+	// connection factory for the address.
+	address := os.Getenv("FASTCGI_ADDR")
+	connFactory := gofast.SimpleConnFactory("tcp", address)
 
-	// handles static assets in the assets folder
-	http.Handle("/assets/",
-		http.StripPrefix("/assets/",
-			http.FileSystem(http.Dir("/var/www/html/assets"))))
-
-	// handle all scripts in document root
-	http.Handle("/", NewHandler("/var/www/html", "tcp", fcgiAddr))
+	// route all requests to a single php file
+	http.Handle("/", gofast.NewHandler(
+		gofast.NewFileEndpoint("/var/www/html/index.php"),
+		gofast.SimpleClientFactory(connFactory, 0),
+	))
 
 	// serve at 8080 port
 	log.Fatal(http.ListenAndServe(":8080", nil))
@@ -100,10 +91,21 @@ func main() {
 
 ```
 
-### Pooling
+### Advanced Example
+
+#### Normal PHP Application
+
+To serve normal PHP application, you'd need to:
+
+1. Serve the static assets from file system; and
+1. Serve only the path with relevant PHP file.
+
+<details>
+<summary>Code</summary>
+<div>
+
 
 ```go
-// this is a very simple fastcgi web server
 package main
 
 import (
@@ -114,37 +116,23 @@ import (
 	"github.com/yookoala/gofast"
 )
 
-// NewHandler returns a fastcgi web server implementation as an http.Handler
-func NewHandler(root, network, address string) http.Handler {
-
-	// generates http connections
-	connFactory := gofast.SimpleConnFactory(network, address)
-
-	// extra pooling layer
-	pool := gofast.NewClientPool(
-		gofast.SimpleClientFactory(connFactory, 0),
-		10, // buffer size for pre-created client-connection
-		30*time.Second, // life span of a client before expire
-	)
-	h := gofast.NewHandler(
-		gofast.NewPHPFS(root),
-		pool.CreateClient,
-
-	)
-	return h
-}
-
 func main() {
-	// get fastcgi address from env FASTCGI_ADDR
-	fcgiAddr := os.Getenv("FASTCGI_ADDR")
+	// Get fastcgi application server tcp address
+	// from env FASTCGI_ADDR. Then configure
+	// connection factory for the address.
+	address := os.Getenv("FASTCGI_ADDR")
+	connFactory := gofast.SimpleConnFactory("tcp", address)
 
 	// handles static assets in the assets folder
 	http.Handle("/assets/",
 		http.StripPrefix("/assets/",
 			http.FileSystem(http.Dir("/var/www/html/assets"))))
 
-	// handle all scripts in document root
-	http.Handle("/", NewHandler("/var/www/html", "tcp", fcgiAddr))
+	// route all requests to relevant PHP file
+	http.Handle("/", gofast.NewHandler(
+		gofast.NewPHPFS("/var/www/html"),
+		gofast.SimpleClientFactory(connFactory, 0),
+	))
 
 	// serve at 8080 port
 	log.Fatal(http.ListenAndServe(":8080", nil))
@@ -152,6 +140,64 @@ func main() {
 
 ```
 
+</div>
+</details>
+
+
+
+#### Pooling Clients
+
+To have a better, more controlled, scaling property, you may
+scale the clients with ClientPool.
+
+<details>
+<summary>Code</summary>
+<div>
+
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"os"
+
+	"github.com/yookoala/gofast"
+)
+
+func main() {
+	// Get fastcgi application server tcp address
+	// from env FASTCGI_ADDR. Then configure
+	// connection factory for the address.
+	address := os.Getenv("FASTCGI_ADDR")
+	connFactory := gofast.SimpleConnFactory("tcp", address)
+
+	// handles static assets in the assets folder
+	http.Handle("/assets/",
+		http.StripPrefix("/assets/",
+			http.FileSystem(http.Dir("/var/www/html/assets"))))
+
+	// handle all scripts in document root
+	// extra pooling layer
+	pool := gofast.NewClientPool(
+		gofast.SimpleClientFactory(connFactory, 0),
+		10, // buffer size for pre-created client-connection
+		30*time.Second, // life span of a client before expire
+	)
+	http.Handle("/", gofast.NewHandler(
+		gofast.NewPHPFS("/v/var/www/htmlar/www/html"),
+		pool.CreateClient,
+	))
+
+	// serve at 8080 port
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+```
+
+</div>
+</details>
 
 ### Full Examples
 
