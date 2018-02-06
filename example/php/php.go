@@ -2,6 +2,7 @@ package php
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/yookoala/gofast"
 )
@@ -16,6 +17,15 @@ import (
 // address: IP address and port, or the socket physical address of the fastcgi
 //          application.
 func NewHandler(docroot, network, address string) http.Handler {
-	h := gofast.NewHandler(gofast.NewPHPFS(docroot), network, address)
+	connFactory := gofast.SimpleConnFactory(network, address)
+	pool := gofast.NewClientPool(
+		gofast.SimpleClientFactory(connFactory, 0),
+		10,
+		60*time.Second,
+	)
+	h := gofast.NewHandler(
+		gofast.NewPHPFS(docroot),
+		pool.CreateClient,
+	)
 	return h
 }

@@ -145,6 +145,12 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 	resp = NewResponsePipe()
 	readError, writeError := make(chan error), make(chan error)
 
+	// check if connection exists
+	if c.conn == nil {
+		err = fmt.Errorf("client connection has been closed")
+		return
+	}
+
 	// if there is a raw request, use the context deadline
 	var ctx context.Context
 	if req.Raw != nil {
@@ -198,6 +204,18 @@ func (c *client) NewRequest(r *http.Request) (req *Request) {
 	return
 }
 
+// Close implements Client.Close
+// If the inner connection has been closed before,
+// this method would do nothing and return nil
+func (c *client) Close() (err error) {
+	if c.conn == nil {
+		return
+	}
+	err = c.conn.Close()
+	c.conn = nil
+	return
+}
+
 // Client is a client interface of FastCGI
 // application process through given
 // connection (net.Conn)
@@ -217,32 +235,69 @@ type Client interface {
 	// ReleaseID releases a reqID.
 	// It never blocks.
 	ReleaseID(uint16)
+
+	// Close the underlying connection
+	Close() error
 }
 
-// NewClient returns a Client of the given
-// connection (net.Conn).
+// ConnFactory creates new network connections
+// to the FPM application
+type ConnFactory func() (net.Conn, error)
+
+// SimpleConnFactory creates the simplest ConnFactory implementation.
+func SimpleConnFactory(network, address string) ConnFactory {
+	return func() (net.Conn, error) {
+		return net.Dial(network, address)
+	}
+}
+
+// ClientFactory creates new FPM client with proper connection
+// to the FPM application.
+type ClientFactory func() (Client, error)
+
+// SimpleClientFactory returns a ClientFactory implementation
+// with the given ConnFactory.
 //
 // limit is the maximum number of request that the
 // applcation support. 0 means the maximum number
 // available for 16bit request id (65536).
 // Default 0.
 //
-func NewClient(conn net.Conn, limit uint32) Client {
-	cid := make(chan uint16)
-
-	if limit == 0 || limit > 65536 {
-		limit = 65536
-	}
-	go func(maxID uint16) {
-		for i := uint16(0); i < maxID; i++ {
-			cid <- i
+func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
+	return func() (c Client, err error) {
+		// connect to given network address
+		conn, err := connFactory()
+		if err != nil {
+			return
 		}
-		cid <- uint16(maxID)
-	}(uint16(limit - 1))
 
-	return &client{
-		conn:   newConn(conn),
-		chanID: cid,
+		// sanatize limit
+		if limit == 0 || limit > 65536 {
+			limit = 65536
+		}
+
+		// pool requestID for the client
+		//
+		// requestID: Identifies the FastCGI request to which the record belongs.
+		// The Web server re-uses FastCGI request IDs; the application
+		// keeps track of the current state of each request ID on a given
+		// transport connection.
+		//
+		// Ref: https://fast-cgi.github.io/spec#33-records
+		requestID := make(chan uint16)
+		go func(maxID uint16) {
+			for i := uint16(0); i < maxID; i++ {
+				requestID <- i
+			}
+			requestID <- uint16(maxID)
+		}(uint16(limit - 1))
+
+		// create client
+		c = &client{
+			conn:   newConn(conn),
+			chanID: requestID,
+		}
+		return
 	}
 }
 
