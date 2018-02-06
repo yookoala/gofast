@@ -34,7 +34,7 @@ func TestHandler(t *testing.T) {
 
 	// deine a proxy that access the temp fcgi application server
 	p := gofast.NewHandler(
-		gofast.NewPHPFS(""),
+		gofast.NewPHPFS("")(gofast.BasicSession),
 		gofast.SimpleClientFactory(
 			gofast.SimpleConnFactory(
 				l.Addr().Network(),
