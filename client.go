@@ -60,6 +60,7 @@ type Request struct {
 	ID       uint16
 	Params   map[string]string
 	Stdin    io.ReadCloser
+	Data     io.ReadCloser
 	KeepConn bool
 }
 
@@ -122,6 +123,29 @@ func (c *client) writeRequest(resp *ResponsePipe, req *Request) (err error) {
 		}
 	}
 
+	// for filter role, also add the data stream
+	if req.Role == RoleFilter {
+		defer req.Data.Close()
+		p := make([]byte, 1024)
+		var count int
+		for {
+			count, err = req.Data.Read(p)
+			if err == io.EOF {
+				err = nil
+			} else if err != nil {
+				break
+			}
+			if count == 0 {
+				break
+			}
+
+			err = c.conn.writeRecord(typeData, req.ID, p[:count])
+			if err != nil {
+				break
+			}
+		}
+	}
+
 	if err != nil {
 		resp.Close()
 	}
@@ -173,6 +197,30 @@ func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Requ
 // Do implements Client.Do
 func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
+	// validate the request
+	// if role is a filter, it has to have Data stream
+	if req.Role == RoleFilter {
+
+		// validate the request
+		if req.Data == nil {
+			err = fmt.Errorf("filter request requries a data stream")
+		} else if _, ok := req.Params["FCGI_DATA_LAST_MOD"]; !ok {
+			err = fmt.Errorf("filter request requries param FCGI_DATA_LAST_MOD")
+		} else if _, err = strconv.ParseUint(req.Params["FCGI_DATA_LAST_MOD"], 10, 32); err != nil {
+			err = fmt.Errorf("invalid parsing FCGI_DATA_LAST_MOD (%s)", err)
+		} else if _, ok := req.Params["FCGI_DATA_LENGTH"]; !ok {
+			err = fmt.Errorf("filter request requries param FCGI_DATA_LENGTH")
+		} else if _, err = strconv.ParseUint(req.Params["FCGI_DATA_LENGTH"], 10, 32); err != nil {
+			err = fmt.Errorf("invalid parsing FCGI_DATA_LENGTH (%s)", err)
+		}
+
+		// if invalid, end the response stream and return
+		if err != nil {
+			return
+		}
+	}
+
+	// create response pipe
 	resp = NewResponsePipe()
 	readError, writeError := make(chan error), make(chan error)
 
