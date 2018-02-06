@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Role for fastcgi application in spec
@@ -86,17 +87,15 @@ func (c *client) ReleaseID(reqID uint16) {
 }
 
 // writeRequest writes params and stdin to the FastCGI application
-func (c *client) writeRequest(resp *ResponsePipe, req *Request) (err error) {
+func (c *client) writeRequest(req *Request) (err error) {
 
 	// write request header with specified role
 	err = c.conn.writeBeginRequest(req.ID, req.Role, 0)
 	if err != nil {
-		resp.Close()
 		return
 	}
 	err = c.conn.writePairs(typeParams, req.ID, req.Params)
 	if err != nil {
-		resp.Close()
 		return
 	}
 	if req.Stdin == nil {
@@ -145,22 +144,18 @@ func (c *client) writeRequest(resp *ResponsePipe, req *Request) (err error) {
 			}
 		}
 	}
-
-	if err != nil {
-		resp.Close()
-	}
 	return
 }
 
 // readResponse read the FastCGI stdout and stderr, then write
-// to the response pipe
-func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Request) (err error) {
+// to the response pipe. Protocol error will also be written
+// to the error writer in ResponsePipe.
+func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Request) {
 
 	var rec record
-	readError := make(chan error)
+	done := make(chan int)
 
 	defer c.ReleaseID(req.ID)
-	defer resp.Close()
 
 	// readloop in goroutine
 	go func() {
@@ -179,17 +174,18 @@ func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Requ
 			case typeEndRequest:
 				break readLoop
 			default:
-				readError <- fmt.Errorf("unexpected type %#v in readLoop", rec.h.Type)
+				err := fmt.Sprintf("unexpected type %#v in readLoop", rec.h.Type)
+				resp.stdErrWriter.Write([]byte(err))
 			}
 		}
-		close(readError)
+		close(done)
 	}()
 
 	select {
 	case <-ctx.Done():
-		err = fmt.Errorf("timeout or canceled by context")
-	case err = <-readError:
-		// do nothing and return the error
+		// do nothing, let client.Do handle
+	case <-done:
+		// do nothing and end the function
 	}
 	return
 }
@@ -222,7 +218,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
 	// create response pipe
 	resp = NewResponsePipe()
-	readError, writeError := make(chan error), make(chan error)
+	writeError, allDone := make(chan error), make(chan int)
 
 	// check if connection exists
 	if c.conn == nil {
@@ -238,29 +234,50 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 		ctx = context.TODO()
 	}
 
+	// wait group to wait for both read and write to end
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		wg.Wait()
+		close(allDone)
+	}()
+
 	// Run read and write in parallel.
 	// Note: Specification never said "write before read".
 	go func() {
-		readError <- c.writeRequest(resp, req)
-		close(readError)
+		if err := c.writeRequest(req); err != nil {
+			writeError <- err
+		}
+		wg.Done()
 	}()
 
 	// get response in a goroutine and send to response pipe
 	go func() {
-		writeError <- c.readResponse(ctx, resp, req)
-		close(writeError)
+		c.readResponse(ctx, resp, req)
+		wg.Done()
 	}()
 
-	// wait until context deadline
-	// or until writeError is not blocked.
-	select {
-	case <-ctx.Done():
-		err = fmt.Errorf("timeout or canceled by context")
-	case err = <-readError:
-		// do nothing and return the error
-	case err = <-writeError:
-		// do nothing and return the error
-	}
+	// do not block the return of client.Do
+	// and return the response pipes
+	// (or else would be block by the response pipes not being used)
+	go func() {
+		// wait until context deadline
+		// or until writeError is not blocked.
+		select {
+		case <-ctx.Done():
+			// write error to err writer
+			resp.stdErrWriter.Write([]byte("gofast: timeout or canceled"))
+		case err := <-writeError:
+			// write error to err writer
+			resp.stdErrWriter.Write([]byte(err.Error()))
+		case <-allDone:
+			// do nothing
+		}
+
+		// clean up
+		resp.Close()
+		close(writeError)
+	}()
 	return
 }
 
@@ -281,7 +298,12 @@ func (c *client) Close() (err error) {
 // connection (net.Conn)
 type Client interface {
 
-	// Do takes care of a proper FastCGI request
+	// Do  a proper FastCGI request.
+	// Returns the response streams (stdout and stderr)
+	// and the request validation error.
+	//
+	// Note: protocol error will be written to the stderr
+	// stream in the ResponsePipe.
 	Do(req *Request) (resp *ResponsePipe, err error)
 
 	// AllocID allocates a new reqID.
