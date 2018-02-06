@@ -32,6 +32,26 @@ const (
 	RoleFilter
 )
 
+// NewRequest returns a standard FastCGI request
+// with a unique request ID allocted by the client
+func NewRequest(c Client, r *http.Request) (req *Request) {
+	req = &Request{
+		Raw:    r,
+		Role:   RoleResponder,
+		ID:     c.AllocID(),
+		Params: make(map[string]string),
+	}
+
+	// if no http request, return here
+	if r == nil {
+		return
+	}
+
+	// pass body (io.ReadCloser) to stdio
+	req.Stdin = r.Body
+	return
+}
+
 // Request hold information of a standard
 // FastCGI request
 type Request struct {
@@ -196,26 +216,6 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 	return
 }
 
-// NewRequest implements Client.NewRequest
-func (c *client) NewRequest(r *http.Request) (req *Request) {
-	req = &Request{
-		Raw:    r,
-		Role:   RoleResponder,
-		ID:     c.AllocID(),
-		Params: make(map[string]string),
-	}
-
-	// if no http request, return here
-	if r == nil {
-		return
-	}
-
-	// pass body (io.ReadCloser) to stdio
-	req.Stdin = r.Body
-
-	return
-}
-
 // Close implements Client.Close
 // If the inner connection has been closed before,
 // this method would do nothing and return nil
@@ -235,10 +235,6 @@ type Client interface {
 
 	// Do takes care of a proper FastCGI request
 	Do(req *Request) (resp *ResponsePipe, err error)
-
-	// NewRequest returns a standard FastCGI request
-	// with a unique request ID allocted by the client
-	NewRequest(*http.Request) *Request
 
 	// AllocID allocates a new reqID.
 	// It blocks if all possible uint16 IDs are allocated.

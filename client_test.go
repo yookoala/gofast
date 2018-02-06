@@ -39,7 +39,7 @@ func TestClient_NewRequest(t *testing.T) {
 	)()
 
 	for i := uint32(0); i <= 65535; i++ {
-		r := c.NewRequest(nil)
+		r := gofast.NewRequest(c, nil)
 		if want, have := uint16(i), r.ID; want != have {
 			t.Errorf("expected %d, got %d", want, have)
 		}
@@ -49,7 +49,7 @@ func TestClient_NewRequest(t *testing.T) {
 	// when all request ids are already allocated
 	newAlloc := make(chan uint16)
 	go func(c gofast.Client, newAlloc chan<- uint16) {
-		r := c.NewRequest(nil) // should be blocked before releaseID call
+		r := gofast.NewRequest(c, nil) // should be blocked before releaseID call
 		newAlloc <- r.ID
 	}(c, newAlloc)
 
@@ -87,7 +87,7 @@ func TestClient_NewRequestWithLimit(t *testing.T) {
 	)()
 
 	for i := uint32(0); i < limit; i++ {
-		r := c.NewRequest(nil)
+		r := gofast.NewRequest(c, nil)
 		if want, have := uint16(i), r.ID; want != have {
 			t.Errorf("expected %d, got %d", want, have)
 		}
@@ -97,7 +97,7 @@ func TestClient_NewRequestWithLimit(t *testing.T) {
 	// when all request ids are already allocated
 	newAlloc := make(chan uint16)
 	go func(c gofast.Client, newAlloc chan<- uint16) {
-		r := c.NewRequest(nil) // should be blocked before releaseID call
+		r := gofast.NewRequest(c, nil) // should be blocked before releaseID call
 		newAlloc <- r.ID
 	}(c, newAlloc)
 
@@ -149,7 +149,7 @@ func TestClient_StdErr(t *testing.T) {
 				p.network, p.address, err.Error())
 			return
 		}
-		req := c.NewRequest(nil)
+		req := gofast.NewRequest(c, nil)
 
 		// Some required paramters with invalid values
 		req.Params["REQUEST_METHOD"] = ""
