@@ -175,7 +175,7 @@ func TestClient_canceled(t *testing.T) {
 		)()
 		if err != nil {
 			http.Error(w, "failed to connect to FastCGI application", http.StatusBadGateway)
-			log.Printf("gofast: unable to connect to FastCGI application "+
+			log.Printf("web server: unable to connect to FastCGI application "+
 				"(network=%#v, address=%#v, error=%#v)",
 				p.network, p.address, err.Error())
 			return
@@ -188,7 +188,7 @@ func TestClient_canceled(t *testing.T) {
 		cancel() // cancel before reading
 		if err != nil {
 			http.Error(w, "failed to process request", http.StatusInternalServerError)
-			log.Printf("gofast: unable to process request "+
+			log.Printf("web server: unable to process request "+
 				"(network=%#v, address=%#v, error=%#v)",
 				p.network, p.address, err.Error())
 			return
@@ -199,7 +199,7 @@ func TestClient_canceled(t *testing.T) {
 
 		if errBuffer.Len() > 0 {
 			errStr = errBuffer.String()
-			log.Printf("gofast: error stream from application process "+
+			log.Printf("web server: error stream from application process "+
 				"(network=%#v, address=%#v, error=%#v)",
 				p.network, p.address, errStr)
 			return
@@ -260,7 +260,7 @@ func TestClient_StdErr(t *testing.T) {
 		)()
 		if err != nil {
 			http.Error(w, "failed to connect to FastCGI application", http.StatusBadGateway)
-			log.Printf("gofast: unable to connect to FastCGI application "+
+			log.Printf("web server: unable to connect to FastCGI application "+
 				"(network=%#v, address=%#v, error=%#v)",
 				p.network, p.address, err.Error())
 			return
@@ -275,7 +275,7 @@ func TestClient_StdErr(t *testing.T) {
 		resp, err := c.Do(req)
 		if err != nil {
 			http.Error(w, "failed to process request", http.StatusInternalServerError)
-			log.Printf("gofast: unable to process request "+
+			log.Printf("web server: unable to process request "+
 				"(network=%#v, address=%#v, error=%#v)",
 				p.network, p.address, err.Error())
 			return
@@ -285,7 +285,7 @@ func TestClient_StdErr(t *testing.T) {
 
 		if errBuffer.Len() > 0 {
 			errStr = errBuffer.String()
-			log.Printf("gofast: error stream from application process "+
+			log.Printf("web server: error stream from application process "+
 				"(network=%#v, address=%#v, error=%#v)",
 				p.network, p.address, errStr)
 			return
