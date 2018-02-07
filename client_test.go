@@ -2,6 +2,7 @@ package gofast_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -126,6 +127,121 @@ func TestClient_NewRequestWithLimit(t *testing.T) {
 
 func TestClient_canceled(t *testing.T) {
 
+	// proxy implements Proxy interface
+	type proxy struct {
+		network string
+		address string
+	}
+
+	NewRequest := func(c gofast.Client, r *http.Request) (req *gofast.Request) {
+		var isHTTPS string
+		if r.URL.Scheme == "https" || r.URL.Scheme == "wss" {
+			isHTTPS = "on"
+		}
+
+		remoteAddr, remotePort, _ := net.SplitHostPort(r.RemoteAddr)
+		_, serverPort, err := net.SplitHostPort(r.URL.Host)
+		if err != nil {
+			if r.URL.Scheme == "https" || r.URL.Scheme == "wss" {
+				serverPort = "443"
+			} else {
+				serverPort = "80"
+			}
+		}
+
+		req = gofast.NewRequest(c, r)
+		req.Params["CONTENT_TYPE"] = r.Header.Get("Content-Type")
+		req.Params["CONTENT_LENGTH"] = r.Header.Get("Content-Length")
+		req.Params["HTTPS"] = isHTTPS
+		req.Params["GATEWAY_INTERFACE"] = "CGI/1.1"
+		req.Params["REMOTE_ADDR"] = remoteAddr
+		req.Params["REMOTE_PORT"] = remotePort
+		req.Params["SERVER_PORT"] = serverPort
+		req.Params["SERVER_NAME"] = r.Host
+		req.Params["SERVER_PROTOCOL"] = r.Proto
+		req.Params["SERVER_SOFTWARE"] = "gofast"
+		req.Params["REDIRECT_STATUS"] = "200"
+		req.Params["REQUEST_METHOD"] = r.Method
+		req.Params["REQUEST_URI"] = r.RequestURI
+		req.Params["QUERY_STRING"] = r.URL.RawQuery
+		return
+	}
+
+	// ServeHTTP implements http.Handler
+	ServeHTTP := func(p *proxy, w http.ResponseWriter, r *http.Request) (errStr string) {
+		c, err := gofast.SimpleClientFactory(
+			gofast.SimpleConnFactory(p.network, p.address),
+			0,
+		)()
+		if err != nil {
+			http.Error(w, "failed to connect to FastCGI application", http.StatusBadGateway)
+			log.Printf("gofast: unable to connect to FastCGI application "+
+				"(network=%#v, address=%#v, error=%#v)",
+				p.network, p.address, err.Error())
+			return
+		}
+		innerCtx, cancel := context.WithCancel(r.Context())
+		req := NewRequest(c, r.WithContext(innerCtx))
+
+		// handle the result
+		resp, err := c.Do(req)
+		cancel() // cancel before reading
+		if err != nil {
+			http.Error(w, "failed to process request", http.StatusInternalServerError)
+			log.Printf("gofast: unable to process request "+
+				"(network=%#v, address=%#v, error=%#v)",
+				p.network, p.address, err.Error())
+			return
+		}
+
+		errBuffer := new(bytes.Buffer)
+		resp.WriteTo(w, errBuffer)
+
+		if errBuffer.Len() > 0 {
+			errStr = errBuffer.String()
+			log.Printf("gofast: error stream from application process "+
+				"(network=%#v, address=%#v, error=%#v)",
+				p.network, p.address, errStr)
+			return
+		}
+
+		return
+	}
+
+	// create temporary socket in the testing folder
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Errorf("unexpected error: %#v", err.Error())
+	}
+	sock := dir + "/client.test.sock"
+
+	// create temporary fcgi application server
+	// that listens to the socket
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("accessing FastCGI process")
+		fmt.Fprintf(w, "hello world")
+	}
+	l, err := newApp("unix", sock, fn)
+	if err != nil {
+		t.Errorf("unexpected error: %#v", err.Error())
+	}
+	defer os.Remove(sock)
+	defer l.Close()
+
+	// deine a proxy that access the temp fcgi application server
+	w := httptest.NewRecorder()
+
+	// request the application server
+	r, err := http.NewRequest("GET", "/add", nil)
+	if err != nil {
+		t.Errorf("unexpected error: %#v", err.Error())
+	}
+
+	// test error
+	p := &proxy{l.Addr().Network(), l.Addr().String()}
+	if want, have := "gofast: timeout or canceled", ServeHTTP(p, w, r); want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
 }
 
 func TestClient_StdErr(t *testing.T) {
