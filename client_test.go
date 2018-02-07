@@ -183,9 +183,16 @@ func TestClient_canceled(t *testing.T) {
 		innerCtx, cancel := context.WithCancel(r.Context())
 		req := NewRequest(c, r.WithContext(innerCtx))
 
+		// cancel before request
+		cancel()
+		select {
+		case <-time.After(time.Millisecond):
+			// artifically wait for some times
+			// to let the cancel signal kick in
+		}
+
 		// handle the result
 		resp, err := c.Do(req)
-		cancel() // cancel before reading
 		if err != nil {
 			http.Error(w, "failed to process request", http.StatusInternalServerError)
 			log.Printf("web server: unable to process request "+
