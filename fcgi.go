@@ -170,6 +170,10 @@ func (c *conn) writeEndRequest(reqID uint16, appStatus int, protocolStatus uint8
 	return c.writeRecord(typeEndRequest, reqID, b)
 }
 
+func (c *conn) writeAbortRequest(reqID uint16) error {
+	return c.writeRecord(typeAbortRequest, reqID, nil)
+}
+
 func (c *conn) writePairs(recType recType, reqID uint16, pairs map[string]string) error {
 	w := newWriter(c, recType, reqID)
 	b := make([]byte, 8)

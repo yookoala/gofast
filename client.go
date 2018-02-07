@@ -89,6 +89,16 @@ func (c *client) ReleaseID(reqID uint16) {
 // writeRequest writes params and stdin to the FastCGI application
 func (c *client) writeRequest(req *Request) (err error) {
 
+	// end request whenever the function block ends
+	defer func() {
+		if err != nil {
+			// abort the request if there is any error
+			// in previous request writing process.
+			c.conn.writeAbortRequest(req.ID)
+			return
+		}
+	}()
+
 	// write request header with specified role
 	err = c.conn.writeBeginRequest(req.ID, req.Role, 0)
 	if err != nil {
@@ -109,7 +119,7 @@ func (c *client) writeRequest(req *Request) (err error) {
 			if err == io.EOF {
 				err = nil
 			} else if err != nil {
-				break
+				return
 			}
 			if count == 0 {
 				break
@@ -117,7 +127,7 @@ func (c *client) writeRequest(req *Request) (err error) {
 
 			err = c.conn.writeRecord(typeStdin, req.ID, p[:count])
 			if err != nil {
-				break
+				return
 			}
 		}
 	}
@@ -132,7 +142,7 @@ func (c *client) writeRequest(req *Request) (err error) {
 			if err == io.EOF {
 				err = nil
 			} else if err != nil {
-				break
+				return
 			}
 			if count == 0 {
 				break
@@ -140,7 +150,7 @@ func (c *client) writeRequest(req *Request) (err error) {
 
 			err = c.conn.writeRecord(typeData, req.ID, p[:count])
 			if err != nil {
-				break
+				return
 			}
 		}
 	}
