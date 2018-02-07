@@ -405,17 +405,23 @@ func (pipes *ResponsePipe) Close() {
 // WriteTo writes the given output into http.ResponseWriter
 func (pipes *ResponsePipe) WriteTo(rw http.ResponseWriter, ew io.Writer) (err error) {
 	chErr := make(chan error, 2)
+	defer close(chErr)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
 
 	go func() {
 		chErr <- pipes.writeResponse(rw)
+		wg.Done()
 	}()
 	go func() {
 		chErr <- pipes.writeError(ew)
+		wg.Done()
 	}()
 
+	wg.Wait()
 	for i := 0; i < 2; i++ {
 		if err = <-chErr; err != nil {
-			close(chErr)
 			return
 		}
 	}
