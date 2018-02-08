@@ -25,7 +25,7 @@ func NewHandler(entrypoint, network, address string) http.Handler {
 		60*time.Second,
 	)
 	h := gofast.NewHandler(
-		gofast.NewFileEndpoint(entrypoint),
+		gofast.NewFileEndpoint(entrypoint)(gofast.BasicSession),
 		pool.CreateClient,
 	)
 	return h

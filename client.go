@@ -20,56 +20,126 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+// Role for fastcgi application in spec
+type Role uint16
+
+// Roles specified in the fastcgi spec
+const (
+	RoleResponder Role = iota + 1
+	RoleAuthorizer
+	RoleFilter
+)
+
+// NewRequest returns a standard FastCGI request
+// with a unique request ID allocted by the client
+func NewRequest(r *http.Request) (req *Request) {
+	req = &Request{
+		Raw:    r,
+		Role:   RoleResponder,
+		Params: make(map[string]string),
+	}
+
+	// if no http request, return here
+	if r == nil {
+		return
+	}
+
+	// pass body (io.ReadCloser) to stdio
+	req.Stdin = r.Body
+	return
+}
 
 // Request hold information of a standard
 // FastCGI request
 type Request struct {
 	Raw      *http.Request
-	ID       uint16
+	Role     Role
 	Params   map[string]string
 	Stdin    io.ReadCloser
+	Data     io.ReadCloser
 	KeepConn bool
+}
+
+type idPool struct {
+	IDs chan uint16
+}
+
+// AllocID implements Client.AllocID
+func (p *idPool) Alloc() uint16 {
+	return <-p.IDs
+}
+
+// ReleaseID implements Client.ReleaseID
+func (p *idPool) Release(id uint16) {
+	go func() {
+		// release the ID back to channel for reuse
+		// use goroutine to prev0, ent blocking ReleaseID
+		p.IDs <- id
+	}()
+}
+
+func newIDs(limit uint32) (p idPool) {
+
+	// sanatize limit
+	if limit == 0 || limit > 65536 {
+		limit = 65536
+	}
+
+	// pool requestID for the client
+	//
+	// requestID: Identifies the FastCGI request to which the record belongs.
+	// The Web server re-uses FastCGI request IDs; the application
+	// keeps track of the current state of each request ID on a given
+	// transport connection.
+	//
+	// Ref: https://fast-cgi.github.io/spec#33-records
+	ids := make(chan uint16)
+	go func(maxID uint16) {
+		for i := uint16(0); i < maxID; i++ {
+			ids <- i
+		}
+		ids <- uint16(maxID)
+	}(uint16(limit - 1))
+
+	p.IDs = ids
+	return
 }
 
 // client is the default implementation of Client
 type client struct {
-	conn   *conn
-	chanID chan uint16
-}
-
-// AllocID implements Client.AllocID
-func (c *client) AllocID() (reqID uint16) {
-	reqID = <-c.chanID
-	return
-}
-
-// ReleaseID implements Client.ReleaseID
-func (c *client) ReleaseID(reqID uint16) {
-	go func() {
-		// release the ID back to channel for reuse
-		// use goroutine to prevent blocking ReleaseID
-		c.chanID <- reqID
-	}()
+	conn *conn
+	ids  idPool
 }
 
 // writeRequest writes params and stdin to the FastCGI application
-func (c *client) writeRequest(resp *ResponsePipe, req *Request) (err error) {
+func (c *client) writeRequest(reqID uint16, req *Request) (err error) {
 
-	// FIXME: add other role implementation, add role field to Request
-	err = c.conn.writeBeginRequest(req.ID, uint16(roleResponder), 0)
+	// end request whenever the function block ends
+	defer func() {
+		if err != nil {
+			// abort the request if there is any error
+			// in previous request writing process.
+			c.conn.writeAbortRequest(reqID)
+			return
+		}
+	}()
+
+	// write request header with specified role
+	err = c.conn.writeBeginRequest(reqID, req.Role, 1)
 	if err != nil {
-		resp.Close()
 		return
 	}
-	err = c.conn.writePairs(typeParams, req.ID, req.Params)
+	err = c.conn.writePairs(typeParams, reqID, req.Params)
 	if err != nil {
-		resp.Close()
 		return
 	}
-	if req.Stdin == nil {
-		err = c.conn.writeRecord(typeStdin, req.ID, []byte{})
-	} else {
+
+	// write the stdin stream
+	stdinWriter := newWriter(c.conn, typeStdin, reqID)
+	if req.Stdin != nil {
 		defer req.Stdin.Close()
 		p := make([]byte, 1024)
 		var count int
@@ -78,34 +148,61 @@ func (c *client) writeRequest(resp *ResponsePipe, req *Request) (err error) {
 			if err == io.EOF {
 				err = nil
 			} else if err != nil {
-				break
+				stdinWriter.Close()
+				return
 			}
 			if count == 0 {
 				break
 			}
 
-			err = c.conn.writeRecord(typeStdin, req.ID, p[:count])
+			_, err = stdinWriter.Write(p[:count])
 			if err != nil {
-				break
+				stdinWriter.Close()
+				return
 			}
 		}
 	}
+	if err = stdinWriter.Close(); err != nil {
+		return
+	}
 
-	if err != nil {
-		resp.Close()
+	// for filter role, also add the data stream
+	if req.Role == RoleFilter {
+		// write the data stream
+		dataWriter := newWriter(c.conn, typeData, reqID)
+		defer req.Data.Close()
+		p := make([]byte, 1024)
+		var count int
+		for {
+			count, err = req.Data.Read(p)
+			if err == io.EOF {
+				err = nil
+			} else if err != nil {
+				return
+			}
+			if count == 0 {
+				break
+			}
+
+			_, err = dataWriter.Write(p[:count])
+			if err != nil {
+				return
+			}
+		}
+		if err = dataWriter.Close(); err != nil {
+			return
+		}
 	}
 	return
 }
 
 // readResponse read the FastCGI stdout and stderr, then write
-// to the response pipe
-func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Request) (err error) {
+// to the response pipe. Protocol error will also be written
+// to the error writer in ResponsePipe.
+func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Request) {
 
 	var rec record
-	readError := make(chan error)
-
-	defer c.ReleaseID(req.ID)
-	defer resp.Close()
+	done := make(chan int)
 
 	// readloop in goroutine
 	go func() {
@@ -124,17 +221,18 @@ func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Requ
 			case typeEndRequest:
 				break readLoop
 			default:
-				readError <- fmt.Errorf("unexpected type %#v in readLoop", rec.h.Type)
+				err := fmt.Sprintf("unexpected type %#v in readLoop", rec.h.Type)
+				resp.stdErrWriter.Write([]byte(err))
 			}
 		}
-		close(readError)
+		close(done)
 	}()
 
 	select {
 	case <-ctx.Done():
-		err = fmt.Errorf("timeout or canceled by context")
-	case err = <-readError:
-		// do nothing and return the error
+		// do nothing, let client.Do handle
+	case <-done:
+		// do nothing and end the function
 	}
 	return
 }
@@ -142,8 +240,34 @@ func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Requ
 // Do implements Client.Do
 func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
+	// validate the request
+	// if role is a filter, it has to have Data stream
+	if req.Role == RoleFilter {
+		// validate the request
+		if req.Data == nil {
+			err = fmt.Errorf("filter request requries a data stream")
+		} else if _, ok := req.Params["FCGI_DATA_LAST_MOD"]; !ok {
+			err = fmt.Errorf("filter request requries param FCGI_DATA_LAST_MOD")
+		} else if _, err = strconv.ParseUint(req.Params["FCGI_DATA_LAST_MOD"], 10, 32); err != nil {
+			err = fmt.Errorf("invalid parsing FCGI_DATA_LAST_MOD (%s)", err)
+		} else if _, ok := req.Params["FCGI_DATA_LENGTH"]; !ok {
+			err = fmt.Errorf("filter request requries param FCGI_DATA_LENGTH")
+		} else if _, err = strconv.ParseUint(req.Params["FCGI_DATA_LENGTH"], 10, 32); err != nil {
+			err = fmt.Errorf("invalid parsing FCGI_DATA_LENGTH (%s)", err)
+		}
+
+		// if invalid, end the response stream and return
+		if err != nil {
+			return
+		}
+	}
+
+	// allocate request ID
+	reqID := c.ids.Alloc()
+
+	// create response pipe
 	resp = NewResponsePipe()
-	readError, writeError := make(chan error), make(chan error)
+	writeError, allDone := make(chan error), make(chan int)
 
 	// check if connection exists
 	if c.conn == nil {
@@ -159,48 +283,51 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 		ctx = context.TODO()
 	}
 
+	// wait group to wait for both read and write to end
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		wg.Wait()
+		close(allDone)
+	}()
+
 	// Run read and write in parallel.
 	// Note: Specification never said "write before read".
 	go func() {
-		readError <- c.writeRequest(resp, req)
-		close(readError)
+		if err := c.writeRequest(reqID, req); err != nil {
+			writeError <- err
+		}
+		wg.Done()
 	}()
 
 	// get response in a goroutine and send to response pipe
 	go func() {
-		writeError <- c.readResponse(ctx, resp, req)
-		close(writeError)
+		c.readResponse(ctx, resp, req)
+		wg.Done()
 	}()
 
-	// wait until context deadline
-	// or until writeError is not blocked.
-	select {
-	case <-ctx.Done():
-		err = fmt.Errorf("timeout or canceled by context")
-	case err = <-readError:
-		// do nothing and return the error
-	case err = <-writeError:
-		// do nothing and return the error
-	}
-	return
-}
+	// do not block the return of client.Do
+	// and return the response pipes
+	// (or else would be block by the response pipes not being used)
+	go func() {
+		// wait until context deadline
+		// or until writeError is not blocked.
+		select {
+		case <-ctx.Done():
+			// write error to err writer
+			resp.stdErrWriter.Write([]byte("gofast: timeout or canceled"))
+		case err := <-writeError:
+			// write error to err writer
+			resp.stdErrWriter.Write([]byte(err.Error()))
+		case <-allDone:
+			// do nothing
+		}
 
-// NewRequest implements Client.NewRequest
-func (c *client) NewRequest(r *http.Request) (req *Request) {
-	req = &Request{
-		Raw:    r,
-		ID:     c.AllocID(),
-		Params: make(map[string]string),
-	}
-
-	// if no http request, return here
-	if r == nil {
-		return
-	}
-
-	// pass body (io.ReadCloser) to stdio
-	req.Stdin = r.Body
-
+		// clean up
+		c.ids.Release(reqID)
+		resp.Close()
+		close(writeError)
+	}()
 	return
 }
 
@@ -221,20 +348,13 @@ func (c *client) Close() (err error) {
 // connection (net.Conn)
 type Client interface {
 
-	// Do takes care of a proper FastCGI request
+	// Do  a proper FastCGI request.
+	// Returns the response streams (stdout and stderr)
+	// and the request validation error.
+	//
+	// Note: protocol error will be written to the stderr
+	// stream in the ResponsePipe.
 	Do(req *Request) (resp *ResponsePipe, err error)
-
-	// NewRequest returns a standard FastCGI request
-	// with a unique request ID allocted by the client
-	NewRequest(*http.Request) *Request
-
-	// AllocID allocates a new reqID.
-	// It blocks if all possible uint16 IDs are allocated.
-	AllocID() uint16
-
-	// ReleaseID releases a reqID.
-	// It never blocks.
-	ReleaseID(uint16)
 
 	// Close the underlying connection
 	Close() error
@@ -271,31 +391,10 @@ func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
 			return
 		}
 
-		// sanatize limit
-		if limit == 0 || limit > 65536 {
-			limit = 65536
-		}
-
-		// pool requestID for the client
-		//
-		// requestID: Identifies the FastCGI request to which the record belongs.
-		// The Web server re-uses FastCGI request IDs; the application
-		// keeps track of the current state of each request ID on a given
-		// transport connection.
-		//
-		// Ref: https://fast-cgi.github.io/spec#33-records
-		requestID := make(chan uint16)
-		go func(maxID uint16) {
-			for i := uint16(0); i < maxID; i++ {
-				requestID <- i
-			}
-			requestID <- uint16(maxID)
-		}(uint16(limit - 1))
-
 		// create client
 		c = &client{
-			conn:   newConn(conn),
-			chanID: requestID,
+			conn: newConn(conn),
+			ids:  newIDs(limit),
 		}
 		return
 	}
@@ -327,17 +426,23 @@ func (pipes *ResponsePipe) Close() {
 // WriteTo writes the given output into http.ResponseWriter
 func (pipes *ResponsePipe) WriteTo(rw http.ResponseWriter, ew io.Writer) (err error) {
 	chErr := make(chan error, 2)
+	defer close(chErr)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
 
 	go func() {
 		chErr <- pipes.writeResponse(rw)
+		wg.Done()
 	}()
 	go func() {
 		chErr <- pipes.writeError(ew)
+		wg.Done()
 	}()
 
+	wg.Wait()
 	for i := 0; i < 2; i++ {
 		if err = <-chErr; err != nil {
-			close(chErr)
 			return
 		}
 	}

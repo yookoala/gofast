@@ -24,7 +24,7 @@ func NewHandler(docroot, network, address string) http.Handler {
 		60*time.Second,
 	)
 	h := gofast.NewHandler(
-		gofast.NewPHPFS(docroot),
+		gofast.NewPHPFS(docroot)(gofast.BasicSession),
 		pool.CreateClient,
 	)
 	return h

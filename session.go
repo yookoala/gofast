@@ -1,11 +1,16 @@
 package gofast
 
 import (
+	"fmt"
 	"net"
+	"net/http"
 	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"golang.org/x/tools/godoc/vfs"
+	"golang.org/x/tools/godoc/vfs/httpfs"
 )
 
 // SessionHandler handles the gofast *Reqeust with the provided given Client.
@@ -122,6 +127,31 @@ func BasicParamsMap(inner SessionHandler) SessionHandler {
 		req.Params["REQUEST_METHOD"] = r.Method
 		req.Params["REQUEST_URI"] = r.RequestURI
 		req.Params["QUERY_STRING"] = r.URL.RawQuery
+
+		return inner(client, req)
+	}
+}
+
+// FilterAuthReqParams filter out FCGI_PARAMS key-value that is explicitly
+// forbidden to passed on in factcgi specification, include:
+//  CONTENT_LENGTH;
+//  PATH_INFO;
+//  PATH_TRANSLATED; and
+//  SCRIPT_NAME
+func FilterAuthReqParams(inner SessionHandler) SessionHandler {
+	return func(client Client, req *Request) (*ResponsePipe, error) {
+		if _, ok := req.Params["CONTENT_LENGTH"]; ok {
+			delete(req.Params, "CONTENT_LENGTH")
+		}
+		if _, ok := req.Params["PATH_INFO"]; ok {
+			delete(req.Params, "PATH_INFO")
+		}
+		if _, ok := req.Params["PATH_TRANSLATED"]; ok {
+			delete(req.Params, "PATH_TRANSLATED")
+		}
+		if _, ok := req.Params["SCRIPT_NAME"]; ok {
+			delete(req.Params, "SCRIPT_NAME")
+		}
 
 		return inner(client, req)
 	}
@@ -259,6 +289,81 @@ func MapEndpoint(endpointFile string) Middleware {
 	}
 }
 
+// MapFilterRequest changes the request role to RoleFilter and add the
+// Data stream from the given file system, if file exists. Also
+// set the required params to request.
+//
+// If the file do not exists or cannot be opened, the middleware
+// will return empty response pipe and the error.
+func MapFilterRequest(fs http.FileSystem) Middleware {
+	return func(inner SessionHandler) SessionHandler {
+		return func(client Client, req *Request) (*ResponsePipe, error) {
+
+			// force role to be RoleFilter
+			req.Role = RoleFilter
+
+			// define some required cgi parameters
+			// with the given http request
+			r := req.Raw
+			fastcgiScriptName := r.URL.Path
+
+			var fastcgiPathInfo string
+			pathinfoRe := regexp.MustCompile(`^(.+\.php)(/?.+)$`)
+			if matches := pathinfoRe.FindStringSubmatch(fastcgiScriptName); len(matches) > 0 {
+				fastcgiScriptName, fastcgiPathInfo = matches[1], matches[2]
+			}
+
+			req.Params["PATH_INFO"] = fastcgiPathInfo
+			req.Params["SCRIPT_NAME"] = fastcgiScriptName
+			req.Params["DOCUMENT_URI"] = r.URL.Path
+
+			// handle directory index
+			urlPath := r.URL.Path
+			if strings.HasSuffix(urlPath, "/") {
+				urlPath = path.Join(urlPath, "index.php")
+			}
+
+			// find the file
+			f, err := fs.Open(urlPath)
+			if err != nil {
+				err = fmt.Errorf("cannot open file: %s", err)
+				return nil, err
+			}
+
+			// map fcgi params for filtering
+			s, err := f.Stat()
+			if err != nil {
+				err = fmt.Errorf("cannot stat file: %s", err)
+				return nil, err
+			}
+			req.Params["FCGI_DATA_LAST_MOD"] = fmt.Sprintf("%d", s.ModTime().Unix())
+			req.Params["FCGI_DATA_LENGTH"] = fmt.Sprintf("%d", s.Size())
+
+			// use the file as FCGI_DATA in request
+			req.Data = f
+			return inner(client, req)
+		}
+	}
+}
+
+// NewFilterLocalFS is a shortcut to use NewFilterFS with
+// a http.FileSystem created for the given local folder.
+func NewFilterLocalFS(root string) Middleware {
+	fs := httpfs.New(vfs.OS(root))
+	return NewFilterFS(fs)
+}
+
+// NewFilterFS chains BasicParamsMap, MapHeader and MapFilterRequest
+// to implement Middleware that prepares a fastcgi Filter session
+// environment.
+func NewFilterFS(fs http.FileSystem) Middleware {
+	return Chain(
+		BasicParamsMap,
+		MapHeader,
+		MapFilterRequest(fs),
+	)
+}
+
 // NewPHPFS chains BasicParamsMap, MapHeader and FileSystemRouter to implement
 // Middleware that prepares an ordinary PHP hosting session environment.
 func NewPHPFS(root string) Middleware {
@@ -281,5 +386,15 @@ func NewFileEndpoint(endpointFile string) Middleware {
 		BasicParamsMap,
 		MapHeader,
 		MapEndpoint(endpointFile),
+	)
+}
+
+// NewAuthPrepare chains BasicParamsMap, MapHeader, FilterAuthReqParams to
+// implement Middleware that prepares a authorizer request
+func NewAuthPrepare() Middleware {
+	return Chain(
+		BasicParamsMap,
+		MapHeader,
+		FilterAuthReqParams,
 	)
 }

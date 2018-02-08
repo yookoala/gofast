@@ -37,6 +37,41 @@ const (
 	typeUnknownType     recType = 11
 )
 
+// String implements fmt.Stringer
+func (t recType) String() string {
+	switch t {
+	case typeBeginRequest:
+		return "FCGI_BEGIN_REQUEST"
+	case typeAbortRequest:
+		return "FCGI_BEGIN_REQUEST"
+	case typeEndRequest:
+		return "FCGI_END_REQUEST"
+	case typeParams:
+		return "FCGI_PARAMS"
+	case typeStdin:
+		return "FCGI_STDIN"
+	case typeStdout:
+		return "FCGI_STDOUT"
+	case typeStderr:
+		return "FCGI_STDERR"
+	case typeData:
+		return "FCGI_DATA"
+	case typeGetValues:
+		return "FCGI_GET_VALUES"
+	case typeGetValuesResult:
+		return "FCGI_GET_VALUES_RESULT"
+	case typeUnknownType:
+		fallthrough
+	default:
+		return "FCGI_UNKNOWN_TYPE"
+	}
+}
+
+// GoString implements fmt.GoStringer
+func (t recType) GoString() string {
+	return t.String()
+}
+
 // keep the connection between web-server and responder open after request
 const flagKeepConn = 1
 
@@ -158,7 +193,7 @@ func (c *conn) writeRecord(recType recType, reqID uint16, b []byte) error {
 	return err
 }
 
-func (c *conn) writeBeginRequest(reqID uint16, role uint16, flags uint8) error {
+func (c *conn) writeBeginRequest(reqID uint16, role Role, flags uint8) error {
 	b := [8]byte{byte(role >> 8), byte(role), flags}
 	return c.writeRecord(typeBeginRequest, reqID, b[:])
 }
@@ -168,6 +203,10 @@ func (c *conn) writeEndRequest(reqID uint16, appStatus int, protocolStatus uint8
 	binary.BigEndian.PutUint32(b, uint32(appStatus))
 	b[4] = protocolStatus
 	return c.writeRecord(typeEndRequest, reqID, b)
+}
+
+func (c *conn) writeAbortRequest(reqID uint16) error {
+	return c.writeRecord(typeAbortRequest, reqID, nil)
 }
 
 func (c *conn) writePairs(recType recType, reqID uint16, pairs map[string]string) error {

@@ -16,15 +16,7 @@ type Handler interface {
 // act as the "web server" component in fastcgi specification, which connects
 // fastcgi "application" through the network/address and passthrough I/O as
 // specified.
-//
-// An extra Middleware (if nil, will be ignored) can be provided to modify
-// the *Request or rewrite the response stream.
-//
-func NewHandler(middleware Middleware, clientFactory ClientFactory) Handler {
-	sessionHandler := BasicSession
-	if middleware != nil {
-		sessionHandler = middleware(sessionHandler)
-	}
+func NewHandler(sessionHandler SessionHandler, clientFactory ClientFactory) Handler {
 	return &defaultHandler{
 		sessionHandler: sessionHandler,
 		newClient:      clientFactory,
@@ -56,7 +48,7 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// handle the session
-	resp, err := h.sessionHandler(c, c.NewRequest(r))
+	resp, err := h.sessionHandler(c, NewRequest(r))
 	if err != nil {
 		http.Error(w, "failed to process request", http.StatusInternalServerError)
 		log.Printf("gofast: unable to process request %s",
