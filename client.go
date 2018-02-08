@@ -100,7 +100,7 @@ func (c *client) writeRequest(req *Request) (err error) {
 	}()
 
 	// write request header with specified role
-	err = c.conn.writeBeginRequest(req.ID, req.Role, 0)
+	err = c.conn.writeBeginRequest(req.ID, req.Role, 1)
 	if err != nil {
 		return
 	}
@@ -108,9 +108,10 @@ func (c *client) writeRequest(req *Request) (err error) {
 	if err != nil {
 		return
 	}
-	if req.Stdin == nil {
-		err = c.conn.writeRecord(typeStdin, req.ID, []byte{})
-	} else {
+
+	// write the stdin stream
+	stdinWriter := newWriter(c.conn, typeStdin, req.ID)
+	if req.Stdin != nil {
 		defer req.Stdin.Close()
 		p := make([]byte, 1024)
 		var count int
@@ -119,21 +120,28 @@ func (c *client) writeRequest(req *Request) (err error) {
 			if err == io.EOF {
 				err = nil
 			} else if err != nil {
+				stdinWriter.Close()
 				return
 			}
 			if count == 0 {
 				break
 			}
 
-			err = c.conn.writeRecord(typeStdin, req.ID, p[:count])
+			_, err = stdinWriter.Write(p[:count])
 			if err != nil {
+				stdinWriter.Close()
 				return
 			}
 		}
 	}
+	if err = stdinWriter.Close(); err != nil {
+		return
+	}
 
 	// for filter role, also add the data stream
 	if req.Role == RoleFilter {
+		// write the data stream
+		dataWriter := newWriter(c.conn, typeData, req.ID)
 		defer req.Data.Close()
 		p := make([]byte, 1024)
 		var count int
@@ -148,10 +156,13 @@ func (c *client) writeRequest(req *Request) (err error) {
 				break
 			}
 
-			err = c.conn.writeRecord(typeData, req.ID, p[:count])
+			_, err = dataWriter.Write(p[:count])
 			if err != nil {
 				return
 			}
+		}
+		if err = dataWriter.Close(); err != nil {
+			return
 		}
 	}
 	return
