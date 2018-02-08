@@ -74,5 +74,23 @@ func NewMuxHandler(
 		entrypoint,
 		pool.CreateClient,
 	)))
+
+	// authorized endpoint
+	authorizer := gofast.NewAuthorizer(
+		pool.CreateClient,
+		gofast.NewAuthPrepare()(gofast.BasicSession),
+	)
+	// this endpoint is guarded by authorizer application
+	//
+	// note: you may use different pool / connFactory to connect
+	// to different fastcgi authorizer application than the inner
+	// content.
+	mux.Handle(
+		"/authorized/responder/",
+		http.StripPrefix("/authorized/responder/", authorizer.Wrap(NewResponderHandler(
+			entrypoint,
+			pool.CreateClient,
+		))),
+	)
 	return mux
 }

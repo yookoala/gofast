@@ -132,6 +132,31 @@ func BasicParamsMap(inner SessionHandler) SessionHandler {
 	}
 }
 
+// FilterAuthReqParams filter out FCGI_PARAMS key-value that is explicitly
+// forbidden to passed on in factcgi specification, include:
+//  CONTENT_LENGTH;
+//  PATH_INFO;
+//  PATH_TRANSLATED; and
+//  SCRIPT_NAME
+func FilterAuthReqParams(inner SessionHandler) SessionHandler {
+	return func(client Client, req *Request) (*ResponsePipe, error) {
+		if _, ok := req.Params["CONTENT_LENGTH"]; ok {
+			delete(req.Params, "CONTENT_LENGTH")
+		}
+		if _, ok := req.Params["PATH_INFO"]; ok {
+			delete(req.Params, "PATH_INFO")
+		}
+		if _, ok := req.Params["PATH_TRANSLATED"]; ok {
+			delete(req.Params, "PATH_TRANSLATED")
+		}
+		if _, ok := req.Params["SCRIPT_NAME"]; ok {
+			delete(req.Params, "SCRIPT_NAME")
+		}
+
+		return inner(client, req)
+	}
+}
+
 // FileSystemRouter helps to produce Middleware implementation for
 // mapping path related fastcgi parameters. See method Router for usage.
 type FileSystemRouter struct {
@@ -361,5 +386,15 @@ func NewFileEndpoint(endpointFile string) Middleware {
 		BasicParamsMap,
 		MapHeader,
 		MapEndpoint(endpointFile),
+	)
+}
+
+// NewAuthPrepare chains BasicParamsMap, MapHeader, FilterAuthReqParams to
+// implement Middleware that prepares a authorizer request
+func NewAuthPrepare() Middleware {
+	return Chain(
+		BasicParamsMap,
+		MapHeader,
+		FilterAuthReqParams,
 	)
 }

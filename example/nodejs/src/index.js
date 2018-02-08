@@ -20,9 +20,30 @@ responder = function(req, res) {
   }
 }
 authorizer = function (req, res) {
-  // placeholder for now
-  res.writeHead(200);
-  res.end();
+  if (req.method === 'GET' || req.method === 'POST') {
+    // simple authorizer check
+    //
+    // Note: according to spec, authorizer have no
+    // information from:
+    // - CONTENT_LENGTH;
+    // - PATH_INFO;
+    // - PATH_TRANSLATED; and
+    // - SCRIPT_NAME
+    //
+    req.on('complete', function () {
+      const authHeader = req.headers.authorization || '';
+      if (authHeader === 'hello-auth') {
+        res.writeHead(200);
+        res.end();
+        return;
+      }
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('authorizer app: permission denied');
+    });
+  } else {
+    res.writeHead(501, { 'Content-Type': 'text/plain' });
+    res.end('unsupported method');
+  }
 }
 filter = function (req, res) {
   // a simple filter to reverse the data string as
