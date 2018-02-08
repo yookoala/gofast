@@ -22,7 +22,7 @@ func TestNewAuthRequest(t *testing.T) {
 		return
 	}
 	// clone the request into 2
-	r, req, err := gofast.NewAuthRequest(0, raw)
+	r, req, err := gofast.NewAuthRequest(raw)
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 		return

@@ -35,7 +35,7 @@ const (
 
 // NewRequest returns a standard FastCGI request
 // with a unique request ID allocted by the client
-func NewRequest(id uint16, r *http.Request) (req *Request) {
+func NewRequest(r *http.Request) (req *Request) {
 	req = &Request{
 		Raw:    r,
 		Role:   RoleResponder,
@@ -76,7 +76,7 @@ func (p *idPool) Alloc() uint16 {
 func (p *idPool) Release(id uint16) {
 	go func() {
 		// release the ID back to channel for reuse
-		// use goroutine to prevent blocking ReleaseID
+		// use goroutine to prev0, ent blocking ReleaseID
 		p.IDs <- id
 	}()
 }
@@ -112,17 +112,6 @@ func newIDs(limit uint32) (p idPool) {
 type client struct {
 	conn *conn
 	ids  idPool
-}
-
-// AllocID implements Client.AllocID
-func (c *client) AllocID() (reqID uint16) {
-	reqID = c.ids.Alloc()
-	return
-}
-
-// ReleaseID implements Client.ReleaseID
-func (c *client) ReleaseID(reqID uint16) {
-	c.ids.Release(reqID)
 }
 
 // writeRequest writes params and stdin to the FastCGI application
@@ -197,7 +186,6 @@ func (c *client) writeRequest(reqID uint16, req *Request) (err error) {
 
 			_, err = dataWriter.Write(p[:count])
 			if err != nil {
-				c.AllocID()
 				return
 			}
 		}
@@ -255,7 +243,6 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 	// validate the request
 	// if role is a filter, it has to have Data stream
 	if req.Role == RoleFilter {
-		c.AllocID()
 		// validate the request
 		if req.Data == nil {
 			err = fmt.Errorf("filter request requries a data stream")
@@ -275,6 +262,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 		}
 	}
 
+	// allocate request ID
 	reqID := c.ids.Alloc()
 
 	// create response pipe

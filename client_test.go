@@ -54,7 +54,7 @@ func TestClient_canceled(t *testing.T) {
 			}
 		}
 
-		req = gofast.NewRequest(0, r)
+		req = gofast.NewRequest(r)
 		req.Params["CONTENT_TYPE"] = r.Header.Get("Content-Type")
 		req.Params["CONTENT_LENGTH"] = r.Header.Get("Content-Length")
 		req.Params["HTTPS"] = isHTTPS
@@ -177,7 +177,7 @@ func TestClient_StdErr(t *testing.T) {
 				p.network, p.address, err.Error())
 			return
 		}
-		req := gofast.NewRequest(0, nil)
+		req := gofast.NewRequest(nil)
 
 		// Some required paramters with invalid values
 		req.Params["REQUEST_METHOD"] = ""

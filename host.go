@@ -48,7 +48,7 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// handle the session
-	resp, err := h.sessionHandler(c, NewRequest(0, r))
+	resp, err := h.sessionHandler(c, NewRequest(r))
 	if err != nil {
 		http.Error(w, "failed to process request", http.StatusInternalServerError)
 		log.Printf("gofast: unable to process request %s",

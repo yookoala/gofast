@@ -9,7 +9,7 @@ import (
 // NewAuthRequest returns a new *http.Request
 // and a *Request with the body buffered
 // into new NopReader.
-func NewAuthRequest(id uint16, orgl *http.Request) (r *http.Request, req *Request, err error) {
+func NewAuthRequest(orgl *http.Request) (r *http.Request, req *Request, err error) {
 
 	// new request struct that inherits orgl values
 	r = &http.Request{}
