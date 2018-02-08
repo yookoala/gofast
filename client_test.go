@@ -91,7 +91,7 @@ func TestClient_canceled(t *testing.T) {
 		// cancel before request
 		cancel()
 		select {
-		case <-time.After(time.Millisecond):
+		case <-time.After(5 * time.Millisecond):
 			// artifically wait for some times
 			// to let the cancel signal kick in
 		}
