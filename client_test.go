@@ -30,101 +30,6 @@ func newApp(network, address string, fn http.HandlerFunc) (l net.Listener, err e
 	return
 }
 
-func TestClient_NewRequest(t *testing.T) {
-
-	t.Logf("default limit: %d", 65535)
-
-	c, _ := gofast.SimpleClientFactory(
-		func() (net.Conn, error) { return nil, nil }, // dummy conn factory
-		0,
-	)()
-
-	for i := uint32(0); i <= 65535; i++ {
-		r := gofast.NewRequest(c.AllocID(), nil)
-		if want, have := uint16(i), r.ID; want != have {
-			t.Errorf("expected %d, got %d", want, have)
-		}
-	}
-
-	// test if client can allocate new request
-	// when all request ids are already allocated
-	newAlloc := make(chan uint16)
-	go func(c gofast.Client, newAlloc chan<- uint16) {
-		r := gofast.NewRequest(c.AllocID(), nil) // should be blocked before releaseID call
-		newAlloc <- r.ID
-	}(c, newAlloc)
-
-	select {
-	case reqID := <-newAlloc:
-		t.Errorf("unexpected new allocation: %d", reqID)
-	case <-time.After(time.Millisecond * 100):
-		t.Log("blocks as expected")
-	}
-
-	// now, release a random ID
-	released := uint16(rand.Int31n(65535))
-	go func(c gofast.Client, released uint16) {
-		c.ReleaseID(released)
-	}(c, released)
-
-	select {
-	case reqID := <-newAlloc:
-		if want, have := released, reqID; want != have {
-			t.Errorf("expected %d, got %d", want, have)
-		}
-	case <-time.After(time.Millisecond * 100):
-		t.Errorf("unexpected blocking")
-	}
-}
-
-func TestClient_NewRequestWithLimit(t *testing.T) {
-
-	limit := uint32(rand.Int31n(100) + 10)
-	t.Logf("random limit: %d", limit)
-
-	c, _ := gofast.SimpleClientFactory(
-		func() (net.Conn, error) { return nil, nil }, // dummy conn factory
-		limit,
-	)()
-
-	for i := uint32(0); i < limit; i++ {
-		r := gofast.NewRequest(c.AllocID(), nil)
-		if want, have := uint16(i), r.ID; want != have {
-			t.Errorf("expected %d, got %d", want, have)
-		}
-	}
-
-	// test if client can allocate new request
-	// when all request ids are already allocated
-	newAlloc := make(chan uint16)
-	go func(c gofast.Client, newAlloc chan<- uint16) {
-		r := gofast.NewRequest(c.AllocID(), nil) // should be blocked before releaseID call
-		newAlloc <- r.ID
-	}(c, newAlloc)
-
-	select {
-	case reqID := <-newAlloc:
-		t.Errorf("unexpected new allocation: %d", reqID)
-	case <-time.After(time.Millisecond * 100):
-		t.Log("blocks as expected")
-	}
-
-	// now, release a random ID
-	released := uint16(rand.Int31n(int32(limit)))
-	go func(c gofast.Client, released uint16) {
-		c.ReleaseID(released)
-	}(c, released)
-
-	select {
-	case reqID := <-newAlloc:
-		if want, have := released, reqID; want != have {
-			t.Errorf("expected %d, got %d", want, have)
-		}
-	case <-time.After(time.Millisecond * 100):
-		t.Errorf("unexpected blocking")
-	}
-}
-
 func TestClient_canceled(t *testing.T) {
 
 	// proxy implements Proxy interface
@@ -149,7 +54,7 @@ func TestClient_canceled(t *testing.T) {
 			}
 		}
 
-		req = gofast.NewRequest(c.AllocID(), r)
+		req = gofast.NewRequest(0, r)
 		req.Params["CONTENT_TYPE"] = r.Header.Get("Content-Type")
 		req.Params["CONTENT_LENGTH"] = r.Header.Get("Content-Length")
 		req.Params["HTTPS"] = isHTTPS
@@ -272,7 +177,7 @@ func TestClient_StdErr(t *testing.T) {
 				p.network, p.address, err.Error())
 			return
 		}
-		req := gofast.NewRequest(c.AllocID(), nil)
+		req := gofast.NewRequest(0, nil)
 
 		// Some required paramters with invalid values
 		req.Params["REQUEST_METHOD"] = ""

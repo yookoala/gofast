@@ -87,30 +87,30 @@ func (c *client) ReleaseID(reqID uint16) {
 }
 
 // writeRequest writes params and stdin to the FastCGI application
-func (c *client) writeRequest(req *Request) (err error) {
+func (c *client) writeRequest(reqID uint16, req *Request) (err error) {
 
 	// end request whenever the function block ends
 	defer func() {
 		if err != nil {
 			// abort the request if there is any error
 			// in previous request writing process.
-			c.conn.writeAbortRequest(req.ID)
+			c.conn.writeAbortRequest(reqID)
 			return
 		}
 	}()
 
 	// write request header with specified role
-	err = c.conn.writeBeginRequest(req.ID, req.Role, 1)
+	err = c.conn.writeBeginRequest(reqID, req.Role, 1)
 	if err != nil {
 		return
 	}
-	err = c.conn.writePairs(typeParams, req.ID, req.Params)
+	err = c.conn.writePairs(typeParams, reqID, req.Params)
 	if err != nil {
 		return
 	}
 
 	// write the stdin stream
-	stdinWriter := newWriter(c.conn, typeStdin, req.ID)
+	stdinWriter := newWriter(c.conn, typeStdin, reqID)
 	if req.Stdin != nil {
 		defer req.Stdin.Close()
 		p := make([]byte, 1024)
@@ -141,7 +141,7 @@ func (c *client) writeRequest(req *Request) (err error) {
 	// for filter role, also add the data stream
 	if req.Role == RoleFilter {
 		// write the data stream
-		dataWriter := newWriter(c.conn, typeData, req.ID)
+		dataWriter := newWriter(c.conn, typeData, reqID)
 		defer req.Data.Close()
 		p := make([]byte, 1024)
 		var count int
@@ -175,8 +175,6 @@ func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Requ
 
 	var rec record
 	done := make(chan int)
-
-	defer c.ReleaseID(req.ID)
 
 	// readloop in goroutine
 	go func() {
@@ -237,6 +235,8 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 		}
 	}
 
+	reqID := c.AllocID()
+
 	// create response pipe
 	resp = NewResponsePipe()
 	writeError, allDone := make(chan error), make(chan int)
@@ -266,7 +266,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 	// Run read and write in parallel.
 	// Note: Specification never said "write before read".
 	go func() {
-		if err := c.writeRequest(req); err != nil {
+		if err := c.writeRequest(reqID, req); err != nil {
 			writeError <- err
 		}
 		wg.Done()
@@ -296,6 +296,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 		}
 
 		// clean up
+		c.ReleaseID(req.ID)
 		resp.Close()
 		close(writeError)
 	}()
