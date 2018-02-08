@@ -170,7 +170,7 @@ func TestMapFilterRequest(t *testing.T) {
 		return
 	}
 	c := NopClient(1)
-	_, err = sess(c, gofast.NewRequest(c.AllocID(), r))
+	_, err = sess(c, gofast.NewRequest(0, r))
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 		return

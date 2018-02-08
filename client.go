@@ -39,7 +39,6 @@ func NewRequest(id uint16, r *http.Request) (req *Request) {
 	req = &Request{
 		Raw:    r,
 		Role:   RoleResponder,
-		ID:     id,
 		Params: make(map[string]string),
 	}
 
@@ -58,32 +57,72 @@ func NewRequest(id uint16, r *http.Request) (req *Request) {
 type Request struct {
 	Raw      *http.Request
 	Role     Role
-	ID       uint16
 	Params   map[string]string
 	Stdin    io.ReadCloser
 	Data     io.ReadCloser
 	KeepConn bool
 }
 
+type idPool struct {
+	IDs chan uint16
+}
+
+// AllocID implements Client.AllocID
+func (p *idPool) Alloc() uint16 {
+	return <-p.IDs
+}
+
+// ReleaseID implements Client.ReleaseID
+func (p *idPool) Release(id uint16) {
+	go func() {
+		// release the ID back to channel for reuse
+		// use goroutine to prevent blocking ReleaseID
+		p.IDs <- id
+	}()
+}
+
+func newIDs(limit uint32) (p idPool) {
+
+	// sanatize limit
+	if limit == 0 || limit > 65536 {
+		limit = 65536
+	}
+
+	// pool requestID for the client
+	//
+	// requestID: Identifies the FastCGI request to which the record belongs.
+	// The Web server re-uses FastCGI request IDs; the application
+	// keeps track of the current state of each request ID on a given
+	// transport connection.
+	//
+	// Ref: https://fast-cgi.github.io/spec#33-records
+	ids := make(chan uint16)
+	go func(maxID uint16) {
+		for i := uint16(0); i < maxID; i++ {
+			ids <- i
+		}
+		ids <- uint16(maxID)
+	}(uint16(limit - 1))
+
+	p.IDs = ids
+	return
+}
+
 // client is the default implementation of Client
 type client struct {
-	conn   *conn
-	chanID chan uint16
+	conn *conn
+	ids  idPool
 }
 
 // AllocID implements Client.AllocID
 func (c *client) AllocID() (reqID uint16) {
-	reqID = <-c.chanID
+	reqID = c.ids.Alloc()
 	return
 }
 
 // ReleaseID implements Client.ReleaseID
 func (c *client) ReleaseID(reqID uint16) {
-	go func() {
-		// release the ID back to channel for reuse
-		// use goroutine to prevent blocking ReleaseID
-		c.chanID <- reqID
-	}()
+	c.ids.Release(reqID)
 }
 
 // writeRequest writes params and stdin to the FastCGI application
@@ -158,6 +197,7 @@ func (c *client) writeRequest(reqID uint16, req *Request) (err error) {
 
 			_, err = dataWriter.Write(p[:count])
 			if err != nil {
+				c.AllocID()
 				return
 			}
 		}
@@ -215,7 +255,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 	// validate the request
 	// if role is a filter, it has to have Data stream
 	if req.Role == RoleFilter {
-
+		c.AllocID()
 		// validate the request
 		if req.Data == nil {
 			err = fmt.Errorf("filter request requries a data stream")
@@ -235,7 +275,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 		}
 	}
 
-	reqID := c.AllocID()
+	reqID := c.ids.Alloc()
 
 	// create response pipe
 	resp = NewResponsePipe()
@@ -296,7 +336,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 		}
 
 		// clean up
-		c.ReleaseID(req.ID)
+		c.ids.Release(reqID)
 		resp.Close()
 		close(writeError)
 	}()
@@ -327,14 +367,6 @@ type Client interface {
 	// Note: protocol error will be written to the stderr
 	// stream in the ResponsePipe.
 	Do(req *Request) (resp *ResponsePipe, err error)
-
-	// AllocID allocates a new reqID.
-	// It blocks if all possible uint16 IDs are allocated.
-	AllocID() uint16
-
-	// ReleaseID releases a reqID.
-	// It never blocks.
-	ReleaseID(uint16)
 
 	// Close the underlying connection
 	Close() error
@@ -371,31 +403,10 @@ func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
 			return
 		}
 
-		// sanatize limit
-		if limit == 0 || limit > 65536 {
-			limit = 65536
-		}
-
-		// pool requestID for the client
-		//
-		// requestID: Identifies the FastCGI request to which the record belongs.
-		// The Web server re-uses FastCGI request IDs; the application
-		// keeps track of the current state of each request ID on a given
-		// transport connection.
-		//
-		// Ref: https://fast-cgi.github.io/spec#33-records
-		requestID := make(chan uint16)
-		go func(maxID uint16) {
-			for i := uint16(0); i < maxID; i++ {
-				requestID <- i
-			}
-			requestID <- uint16(maxID)
-		}(uint16(limit - 1))
-
 		// create client
 		c = &client{
-			conn:   newConn(conn),
-			chanID: requestID,
+			conn: newConn(conn),
+			ids:  newIDs(limit),
 		}
 		return
 	}

@@ -27,7 +27,6 @@ func NewAuthRequest(id uint16, orgl *http.Request) (r *http.Request, req *Reques
 	req = &Request{
 		Raw:    orgl,
 		Role:   RoleAuthorizer,
-		ID:     id,
 		Params: make(map[string]string),
 		Stdin:  stdin,
 		Data:   nil,
