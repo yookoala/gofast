@@ -35,11 +35,11 @@ const (
 
 // NewRequest returns a standard FastCGI request
 // with a unique request ID allocted by the client
-func NewRequest(c Client, r *http.Request) (req *Request) {
+func NewRequest(id uint16, r *http.Request) (req *Request) {
 	req = &Request{
 		Raw:    r,
 		Role:   RoleResponder,
-		ID:     c.AllocID(),
+		ID:     id,
 		Params: make(map[string]string),
 	}
 

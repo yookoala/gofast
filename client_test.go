@@ -40,7 +40,7 @@ func TestClient_NewRequest(t *testing.T) {
 	)()
 
 	for i := uint32(0); i <= 65535; i++ {
-		r := gofast.NewRequest(c, nil)
+		r := gofast.NewRequest(c.AllocID(), nil)
 		if want, have := uint16(i), r.ID; want != have {
 			t.Errorf("expected %d, got %d", want, have)
 		}
@@ -50,7 +50,7 @@ func TestClient_NewRequest(t *testing.T) {
 	// when all request ids are already allocated
 	newAlloc := make(chan uint16)
 	go func(c gofast.Client, newAlloc chan<- uint16) {
-		r := gofast.NewRequest(c, nil) // should be blocked before releaseID call
+		r := gofast.NewRequest(c.AllocID(), nil) // should be blocked before releaseID call
 		newAlloc <- r.ID
 	}(c, newAlloc)
 
@@ -88,7 +88,7 @@ func TestClient_NewRequestWithLimit(t *testing.T) {
 	)()
 
 	for i := uint32(0); i < limit; i++ {
-		r := gofast.NewRequest(c, nil)
+		r := gofast.NewRequest(c.AllocID(), nil)
 		if want, have := uint16(i), r.ID; want != have {
 			t.Errorf("expected %d, got %d", want, have)
 		}
@@ -98,7 +98,7 @@ func TestClient_NewRequestWithLimit(t *testing.T) {
 	// when all request ids are already allocated
 	newAlloc := make(chan uint16)
 	go func(c gofast.Client, newAlloc chan<- uint16) {
-		r := gofast.NewRequest(c, nil) // should be blocked before releaseID call
+		r := gofast.NewRequest(c.AllocID(), nil) // should be blocked before releaseID call
 		newAlloc <- r.ID
 	}(c, newAlloc)
 
@@ -149,7 +149,7 @@ func TestClient_canceled(t *testing.T) {
 			}
 		}
 
-		req = gofast.NewRequest(c, r)
+		req = gofast.NewRequest(c.AllocID(), r)
 		req.Params["CONTENT_TYPE"] = r.Header.Get("Content-Type")
 		req.Params["CONTENT_LENGTH"] = r.Header.Get("Content-Length")
 		req.Params["HTTPS"] = isHTTPS
@@ -272,7 +272,7 @@ func TestClient_StdErr(t *testing.T) {
 				p.network, p.address, err.Error())
 			return
 		}
-		req := gofast.NewRequest(c, nil)
+		req := gofast.NewRequest(c.AllocID(), nil)
 
 		// Some required paramters with invalid values
 		req.Params["REQUEST_METHOD"] = ""
