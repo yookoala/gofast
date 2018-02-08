@@ -2,10 +2,26 @@ var fcgi = require('node-fastcgi');
 
 var listenTarget = process.env.TEST_FCGI_SOCK || './node-fastcgi.sock';
 
+
 responder = function(req, res) {
   if (req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('hello index');
+    var body = 'hello index';
+    const custom = []; // custom message
+
+    // search for header messages
+    for (headerKey in req.headers) {
+      if (headerKey.match(/^my-/)) {
+        let key = /^my-(.+?)-message/.exec(headerKey)[1];
+        custom.push(`${key}: ${req.headers[headerKey]}`);
+      }
+    }
+
+    if (custom.length > 0) {
+      res.end(custom.join("\n") + `\n${body}`);
+      return;
+    }
+    res.end(body);
   } else if (req.method === 'POST') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     var body = '';
@@ -33,6 +49,8 @@ authorizer = function (req, res) {
     req.on('complete', function () {
       const authHeader = req.headers.authorization || '';
       if (authHeader === 'hello-auth') {
+        res.setVariable('My-Hello-Message', 'howdy!')
+        res.setVariable('My-Foo-Message', 'bar!')
         res.writeHead(200);
         res.end();
         return;

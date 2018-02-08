@@ -308,8 +308,8 @@ func TestMuxHandler_authorizer(t *testing.T) {
 			testDone <- false
 			return
 		}
-		if want, have := "hello index", w.Body.String(); want != have {
-			t.Errorf("expected %#v, got %#v", want, have)
+		if want1, want2, have := "foo: bar!\nhello: howdy!\nhello index", "hello: howdy!\nfoo: bar!\nhello index", w.Body.String(); want1 != have && want2 != have {
+			t.Errorf("expected %#v or %#v, got %#v", want1, want2, have)
 			testDone <- false
 			return
 		}

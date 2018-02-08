@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 )
 
 // NewAuthRequest returns a new *http.Request
@@ -110,21 +111,35 @@ func (ar Authorizer) Wrap(inner http.Handler) http.Handler {
 			}
 			w.WriteHeader(rw.Code)
 			fmt.Fprintf(w, rw.Body.String())
-			return
-		}
 
-		// if error stream is not empty
-		if ew.Len() > 0 {
-			w.Header().Add("Content-Type", "text/html; charset=utf8")
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "error reading authorizer response: %s", err)
-			log.Printf("gofast: error stream from application process %s",
-				ew.String())
+			// if error stream is not empty
+			// also write to response
+			// TODO: add option to supress this?
+			if ew.Len() > 0 {
+				w.Header().Add("Content-Type", "text/html; charset=utf8")
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprintf(w, "error reading authorizer response: %s", err)
+				log.Printf("gofast: error stream from application process %s",
+					ew.String())
+				return
+			}
 			return
 		}
 
 		// no problem from authorizer
-		// pass down the inner handler
+		// pass down variable to the inner handler
+		// and discard the authorizer stdout and stderr
+		for k, m := range rw.HeaderMap {
+			// looking for header with keys "Variable-*"
+			// strip the prefix and pass to the inner header
+			if len(k) > 9 && strings.HasPrefix(strings.ToLower(k), "variable-") {
+				innerKey := k[9:]
+				for _, v := range m {
+					log.Printf("k: %s, innerKey: %s, v: %s", k, innerKey, v)
+					innerReq.Header.Add(innerKey, v)
+				}
+			}
+		}
 		inner.ServeHTTP(w, innerReq)
 	})
 }
