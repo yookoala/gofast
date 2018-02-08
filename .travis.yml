@@ -29,7 +29,7 @@ before_script:
   # for nodejs tests
   - curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.8/install.sh | bash
   - nvm install 8 && npm install -g yarn
-  - cd ./example/nodejs && yarn install
+  - cd ./example/nodejs && yarn install && cd ../..
 
 script:
   - go test -v -race ./...
