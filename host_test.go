@@ -23,6 +23,11 @@ func TestHandler(t *testing.T) {
 	// that listens to the socket
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		t.Logf("accessing FastCGI process")
+		w.Header().Add("X-Hello", "World 1")
+		w.Header().Add("X-Hello", "World 2")
+		w.Header().Add("X-Foo", "Bar 1")
+		w.Header().Add("X-Foo", "Bar 2")
+		w.WriteHeader(201)
 		fmt.Fprintf(w, "hello world")
 	}
 	l, err := newApp("unix", sock, fn)
@@ -52,8 +57,29 @@ func TestHandler(t *testing.T) {
 	}
 	p.ServeHTTP(w, r)
 
-	// examine the result
+	// examine the body
 	if want, have := "hello world", w.Body.String(); want != have {
 		t.Errorf("expected %#v, got %#v", want, have)
+	}
+
+	// examine the code
+	if want, have := 201, w.Code; want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+
+	// examine the header
+	if field, ok := w.HeaderMap["X-Hello"]; ok {
+		for i, v := range field {
+			if want, have := fmt.Sprintf("World %d", i+1), v; want != have {
+				t.Errorf("expected %#v, got %#v", want, have)
+			}
+		}
+	}
+	if field, ok := w.HeaderMap["X-Foo"]; ok {
+		for i, v := range field {
+			if want, have := fmt.Sprintf("Bar %d", i+1), v; want != have {
+				t.Errorf("expected %#v, got %#v", want, have)
+			}
+		}
 	}
 }

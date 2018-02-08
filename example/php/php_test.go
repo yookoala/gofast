@@ -126,6 +126,12 @@ func TestHandler(t *testing.T) {
 	if want, have := "hello index", w.Body.String(); want != have {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
+	if want, have := "World", w.Header().Get("X-Hello"); want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+	if want, have := "Bar", w.Header().Get("X-Foo"); want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
 
 	w, err = get("/index.php")
 	if err != nil {
