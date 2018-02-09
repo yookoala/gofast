@@ -38,7 +38,7 @@ func TestClient_canceled(t *testing.T) {
 		address string
 	}
 
-	NewRequest := func(c gofast.Client, r *http.Request) (req *gofast.Request) {
+	NewRequest := func(r *http.Request) (req *gofast.Request) {
 		var isHTTPS string
 		if r.URL.Scheme == "https" || r.URL.Scheme == "wss" {
 			isHTTPS = "on"
@@ -86,14 +86,18 @@ func TestClient_canceled(t *testing.T) {
 			return
 		}
 		innerCtx, cancel := context.WithCancel(r.Context())
-		req := NewRequest(c, r.WithContext(innerCtx))
+		req := NewRequest(r.WithContext(innerCtx))
 
 		// cancel before request
 		cancel()
+
+		// wait for the cancel signal to kick in
+		// or the artificial wait timeout
 		select {
-		case <-time.After(5 * time.Millisecond):
-			// artifically wait for some times
-			// to let the cancel signal kick in
+		case <-innerCtx.Done():
+			t.Logf("cancel effective")
+		case <-time.After(100 * time.Millisecond):
+			t.Logf("time out reach")
 		}
 
 		// handle the result
@@ -103,7 +107,6 @@ func TestClient_canceled(t *testing.T) {
 			log.Printf("web server: unable to process request "+
 				"(network=%#v, address=%#v, error=%#v)",
 				p.network, p.address, err.Error())
-			return
 		}
 
 		errBuffer := new(bytes.Buffer)
