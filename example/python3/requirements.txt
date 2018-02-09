@@ -3,6 +3,4 @@
 # in gofast example
 #
 
-#flup-py3
-#hg+https://hg.saddi.com/flup-py3.0/#egg=flup-py3
-git+https://github.com/pquentin/flup-py3.git
+flup-py3>=1.0.3
