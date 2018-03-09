@@ -12,8 +12,8 @@
 
 ## What does it do, really?
 
-In FastCGI specification, a FastCGI system has 2 components: (a) web
-server; and (b) application server. A web server should hand over
+In FastCGI specification, a FastCGI system has 2 components: **(a) web
+server**; and **(b) application server**. A web server should hand over
 request information to the application server through socket. The
 application server always listens to the socket and response to
 socket request accordingly.
@@ -30,6 +30,9 @@ visitor → Apache → php-fpm → Apache → visitor
 **gofast** help you to write the code on the web server part of this
 picture. It helps you to pass the request to application server and
 receive response from it.
+
+You may think of **gofast** as a "client library" to consume
+any FastCGI application server.
 
 Why?
 ----
@@ -48,12 +51,15 @@ Also, this is fun to do :-)
 ## How to Use?
 
 You basically would use the `Handler` as [http.Handler]. You can further mux it
-with [default ServeMux][http.NewServeMux] or other compatible routers. You then
-serve your fastcgi within this golang http server.
+with [default ServeMux][http.NewServeMux] or other compatible routers (e.g.
+[gorilla][gorilla], [pat][pat]). You then serve your fastcgi within this
+golang http server.
 
 [http.Handler]: https://golang.org/pkg/net/http/#Handler
 [mux]: https://golang.org/pkg/net/http/#ServeMux
 [http.NewServeMux]: https://golang.org/pkg/net/http/#NewServeMux
+[gorilla]: https://github.com/gorilla/mux
+[pat]: https://github.com/gorilla/pat
 
 ### Simple Example
 
