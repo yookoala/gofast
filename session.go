@@ -97,15 +97,15 @@ func BasicParamsMap(inner SessionHandler) SessionHandler {
 
 		r := req.Raw
 
-		var isHTTPS string
-		if r.URL.Scheme == "https" || r.URL.Scheme == "wss" {
-			isHTTPS = "on"
+		isHTTPS := r.TLS != nil
+		if isHTTPS {
+			req.Params["HTTPS"] = "on"
 		}
 
 		remoteAddr, remotePort, _ := net.SplitHostPort(r.RemoteAddr)
-		_, serverPort, err := net.SplitHostPort(r.URL.Host)
+		host, serverPort, err := net.SplitHostPort(r.Host)
 		if err != nil {
-			if r.URL.Scheme == "https" || r.URL.Scheme == "wss" {
+			if isHTTPS {
 				serverPort = "443"
 			} else {
 				serverPort = "80"
@@ -115,7 +115,6 @@ func BasicParamsMap(inner SessionHandler) SessionHandler {
 		// the basic information here
 		req.Params["CONTENT_TYPE"] = r.Header.Get("Content-Type")
 		req.Params["CONTENT_LENGTH"] = r.Header.Get("Content-Length")
-		req.Params["HTTPS"] = isHTTPS
 		req.Params["GATEWAY_INTERFACE"] = "CGI/1.1"
 		req.Params["REMOTE_ADDR"] = remoteAddr
 		req.Params["REMOTE_PORT"] = remotePort
