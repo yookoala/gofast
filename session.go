@@ -119,7 +119,7 @@ func BasicParamsMap(inner SessionHandler) SessionHandler {
 		req.Params["REMOTE_ADDR"] = remoteAddr
 		req.Params["REMOTE_PORT"] = remotePort
 		req.Params["SERVER_PORT"] = serverPort
-		req.Params["SERVER_NAME"] = r.Host
+		req.Params["SERVER_NAME"] = host
 		req.Params["SERVER_PROTOCOL"] = r.Proto
 		req.Params["SERVER_SOFTWARE"] = "gofast"
 		req.Params["REDIRECT_STATUS"] = "200"
