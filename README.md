@@ -87,7 +87,7 @@ func main() {
 
 	// route all requests to a single php file
 	http.Handle("/", gofast.NewHandler(
-		gofast.NewFileEndpoint("/var/www/html/index.php"),
+		gofast.NewFileEndpoint("/var/www/html/index.php")(gofast.BasicSession),
 		gofast.SimpleClientFactory(connFactory, 0),
 	))
 
