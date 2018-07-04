@@ -89,6 +89,7 @@ func BasicSession(client Client, req *Request) (*ResponsePipe, error) {
 //  SERVER_SOFTWARE
 //  REDIRECT_STATUS
 //  REQUEST_METHOD
+//  REQUEST_SCHEME
 //  REQUEST_URI
 //  QUERY_STRING
 //
@@ -123,6 +124,7 @@ func BasicParamsMap(inner SessionHandler) SessionHandler {
 		req.Params["SERVER_PROTOCOL"] = r.Proto
 		req.Params["SERVER_SOFTWARE"] = "gofast"
 		req.Params["REDIRECT_STATUS"] = "200"
+		req.Params["REQUEST_SCHEME"] = r.URL.Scheme
 		req.Params["REQUEST_METHOD"] = r.Method
 		req.Params["REQUEST_URI"] = r.RequestURI
 		req.Params["QUERY_STRING"] = r.URL.RawQuery
