@@ -182,6 +182,57 @@ func TestNewSimpleHandler(t *testing.T) {
 	}
 }
 
+func TestNewSimpleHandler__ErrorStream(t *testing.T) {
+
+	if phpfpmPath == "" {
+		t.Skip("empty TEST_PHPFPM_PATH, skip test")
+	}
+	if stat, err := os.Stat(phpfpmPath); os.IsNotExist(err) {
+		t.Errorf("TEST_PHPFPM_PATH (%#v) not found", phpfpmPath)
+		return
+	} else if fmode := stat.Mode(); !fmode.IsRegular() {
+		t.Errorf("TEST_PHPFPM_PATH (%#v) is not a regular file", phpfpmPath)
+		return
+	}
+
+	exmpPath := examplePath()
+	process := phpfpm.NewProcess(phpfpmPath)
+	process.SetDatadir(path.Join(exmpPath, "var"))
+	process.User = username
+	process.SaveConfig(path.Join(exmpPath, "etc", "test.handler.conf"))
+	if err := process.Start(); err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
+	defer process.Stop()
+
+	// start the proxy handler
+	network, address := process.Address()
+	h := php.NewSimpleHandler(
+		path.Join(exmpPath, "htdocs"),
+		network, address)
+
+	// check results
+	w, err := get(h, "/error.php")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+		return
+	}
+	if want, have := "1. some standard output.\n3. some more standard output.\n5. unparsed.\n", w.Body.String(); want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+
+	// check results
+	w, err = get(h, "/error.php?error_only=1")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+		return
+	}
+	if want, have := "", w.Body.String(); want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
+	}
+}
+
 func TestNewFileEndpointHandler(t *testing.T) {
 	if phpfpmPath == "" {
 		t.Skip("empty TEST_PHPFPM_PATH, skip test")
