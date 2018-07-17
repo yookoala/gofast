@@ -225,7 +225,7 @@ func (fs *FileSystemRouter) Router() Middleware {
 //
 // It is a convention to map header field SomeRandomField to
 // HTTP_SOME_RANDOM_FIELD. For example, if a header field "X-Hello-World" is in
-// the header, it will be mapped as "X_HELLO_WORLD" in the fastcgi parameter
+// the header, it will be mapped as "HTTP_X_HELLO_WORLD" in the fastcgi parameter
 // field.
 //
 // Note: HTTP_CONTENT_TYPE and HTTP_CONTENT_LENGTH cannot be overridden.
