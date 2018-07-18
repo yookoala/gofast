@@ -136,7 +136,7 @@ func main() {
 
 	// route all requests to relevant PHP file
 	http.Handle("/", gofast.NewHandler(
-		gofast.NewPHPFS("/var/www/html"),
+		gofast.NewPHPFS("/var/www/html")(gofast.BasicSession),
 		gofast.SimpleClientFactory(connFactory, 0),
 	))
 
@@ -192,7 +192,7 @@ func main() {
 		30*time.Second, // life span of a client before expire
 	)
 	http.Handle("/", gofast.NewHandler(
-		gofast.NewPHPFS("/v/var/www/htmlar/www/html"),
+		gofast.NewPHPFS("/var/www/html")(gofast.BasicSession),
 		pool.CreateClient,
 	))
 
