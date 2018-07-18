@@ -136,7 +136,7 @@ func main() {
 
 	// route all requests to relevant PHP file
 	http.Handle("/", gofast.NewHandler(
-		gofast.NewPHPFS("/var/www/html"),
+		gofast.NewPHPFS("/var/www/html")(gofast.BasicSession),
 		gofast.SimpleClientFactory(connFactory, 0),
 	))
 
@@ -150,6 +150,80 @@ func main() {
 </details>
 
 
+#### Customizing Request Session with Middleware
+
+Each web server request will result in a [gofast.Request][gofast-request].
+And each [gofast.Request][gofast-request] will first run through SessionHandler
+before handing to the `Do()` method of [gofast.Client][gofast-client].
+
+The default [gofast.BasicSession][gofast-basicsession] implementation does
+nothing. The library function like [gofast.NewPHPFS][gofast-phpfs],
+[gofast.NewFileEndpoint][gofast-file-endpoint] are [gofast.Middleware][gofast-middleware]
+implementations, which are lower level middleware chains.
+
+So you may customize your own session by implemention [gofast.Middleware][gofast-middleware].
+
+```go
+
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"os"
+
+	"github.com/yookoala/gofast"
+)
+
+func main() {
+	// Get fastcgi application server tcp address
+	// from env FASTCGI_ADDR. Then configure
+	// connection factory for the address.
+	address := os.Getenv("FASTCGI_ADDR")
+	connFactory := gofast.SimpleConnFactory("tcp", address)
+
+	// a custom authentication handler
+	customAuth := func(inner gofast.SessionHandler) gofast.SessionHandler {
+		return func(client gofast.Client, req *gofast.Request) (gofast.ResponsePipe, error) {
+			user, err := someCustomAuth(
+				req.Raw.Header.Get("Authorization"))
+			if err != nil {
+				// if login not success
+				return nil, err
+			}
+			// set REMOTE_USER accordingly
+			req.Params["REMOTE_USER"] = user
+			// run inner session handler
+			return inner(client, req)
+		}
+	}
+
+	// session handler
+	sess := gofast.Chain(
+		customAuth,            // maps REMOTE_USER
+		gofast.BasicParamsMap, // maps common CGI parameters
+		gofast.MapHeader,      // maps header fields into HTTP_* parameters
+		gofast.MapRemoteHost,  // maps REMOTE_HOST
+	)(gofast.BasicSession)
+
+	// route all requests to a single php file
+	http.Handle("/", gofast.NewHandler(
+		gofast.NewFileEndpoint("/var/www/html/index.php")(sess),
+		gofast.SimpleClientFactory(connFactory, 0),
+	))
+
+	// serve at 8080 port
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+```
+
+[gofast-basicsession]: https://godoc.org/github.com/yookoala/gofast#BasicSession
+[gofast-request]: https://godoc.org/github.com/yookoala/gofast#Request
+[gofast-client]: https://godoc.org/github.com/yookoala/gofast#Client
+[gofast-phpfs]: https://godoc.org/github.com/yookoala/gofast#NewPHPFS
+[gofast-file-endpoint]: https://godoc.org/github.com/yookoala/gofast#NewFileEndpoint
+[gofast-middleware]: https://godoc.org/github.com/yookoala/gofast#Middleware
 
 #### Pooling Clients
 
@@ -192,7 +266,7 @@ func main() {
 		30*time.Second, // life span of a client before expire
 	)
 	http.Handle("/", gofast.NewHandler(
-		gofast.NewPHPFS("/v/var/www/htmlar/www/html"),
+		gofast.NewPHPFS("/var/www/html")(gofast.BasicSession),
 		pool.CreateClient,
 	))
 

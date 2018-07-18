@@ -558,3 +558,18 @@ func (pipes *ResponsePipe) writeResponse(w http.ResponseWriter) (err error) {
 	}
 	return
 }
+
+// ClientFunc is a function wrapper of a Client interface
+// shortcut implementation. Mainly for testing and development
+// purpose.
+type ClientFunc func(req *Request) (resp *ResponsePipe, err error)
+
+// Do implements Client.Do
+func (c ClientFunc) Do(req *Request) (resp *ResponsePipe, err error) {
+	return c(req)
+}
+
+// Close implements Client.Close
+func (c ClientFunc) Close() error {
+	return nil
+}

@@ -54,7 +54,11 @@ type SessionHandler func(client Client, req *Request) (resp *ResponsePipe, err e
 //
 type Middleware func(SessionHandler) SessionHandler
 
-// Chain chains middlewares into a single middleware
+// Chain chains middlewares into a single middleware.
+//
+// The middlewares will be chained from outer to inner. The first
+// middleware will be the first to handle Client and Request. It
+// is also the last to handle ResponsePipe and error.
 func Chain(middlewares ...Middleware) Middleware {
 	if len(middlewares) == 0 {
 		return nil
@@ -89,6 +93,7 @@ func BasicSession(client Client, req *Request) (*ResponsePipe, error) {
 //  SERVER_SOFTWARE
 //  REDIRECT_STATUS
 //  REQUEST_METHOD
+//  REQUEST_SCHEME
 //  REQUEST_URI
 //  QUERY_STRING
 //
@@ -123,10 +128,25 @@ func BasicParamsMap(inner SessionHandler) SessionHandler {
 		req.Params["SERVER_PROTOCOL"] = r.Proto
 		req.Params["SERVER_SOFTWARE"] = "gofast"
 		req.Params["REDIRECT_STATUS"] = "200"
+		req.Params["REQUEST_SCHEME"] = r.URL.Scheme
 		req.Params["REQUEST_METHOD"] = r.Method
 		req.Params["REQUEST_URI"] = r.RequestURI
 		req.Params["QUERY_STRING"] = r.URL.RawQuery
 
+		return inner(client, req)
+	}
+}
+
+// MapRemoteHost does reverse DNS lookup on the r.RemoteAddr IP
+// address.
+func MapRemoteHost(inner SessionHandler) SessionHandler {
+	return func(client Client, req *Request) (*ResponsePipe, error) {
+		r := req.Raw
+		remoteAddr, _, _ := net.SplitHostPort(r.RemoteAddr)
+		names, _ := net.LookupAddr(remoteAddr)
+		if len(names) > 0 {
+			req.Params["REMOTE_HOST"] = strings.TrimRight(names[0], ".")
+		}
 		return inner(client, req)
 	}
 }
@@ -223,7 +243,7 @@ func (fs *FileSystemRouter) Router() Middleware {
 //
 // It is a convention to map header field SomeRandomField to
 // HTTP_SOME_RANDOM_FIELD. For example, if a header field "X-Hello-World" is in
-// the header, it will be mapped as "X_HELLO_WORLD" in the fastcgi parameter
+// the header, it will be mapped as "HTTP_X_HELLO_WORLD" in the fastcgi parameter
 // field.
 //
 // Note: HTTP_CONTENT_TYPE and HTTP_CONTENT_LENGTH cannot be overridden.
