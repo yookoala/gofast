@@ -1,6 +1,7 @@
 package python3_test
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -23,6 +24,24 @@ func examplePath() string {
 	return filepath.Join(basePath, "webapp.py")
 }
 
+func testEnv() error {
+	// a short script to test python and flup installation
+	script := `
+import sys
+try:
+  from flup.server.fcgi import WSGIServer
+except ImportError as err:
+  print(err)
+  sys.exit(1)
+`
+	cmd := exec.Command("python", "-c", script)
+	res, err := cmd.CombinedOutput()
+	if err == nil {
+		return err
+	}
+	return fmt.Errorf("%s", res)
+}
+
 func waitConn(socket string) <-chan net.Conn {
 	chanConn := make(chan net.Conn)
 	go func() {
@@ -40,6 +59,16 @@ func waitConn(socket string) <-chan net.Conn {
 }
 
 func TestHandler(t *testing.T) {
+
+	if err := testEnv(); err != nil {
+		if os.Getenv("CI") != "" {
+			t.Errorf("environment setup error: %s", err)
+			return
+		}
+		t.Skipf("skip test: %s", err)
+		return
+	}
+
 	webapp := examplePath()
 	socket := filepath.Join(filepath.Dir(webapp), "test.sock")
 

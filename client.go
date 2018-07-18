@@ -199,7 +199,7 @@ func (c *client) writeRequest(reqID uint16, req *Request) (err error) {
 // readResponse read the FastCGI stdout and stderr, then write
 // to the response pipe. Protocol error will also be written
 // to the error writer in ResponsePipe.
-func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Request) {
+func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Request) (err error) {
 
 	var rec record
 	done := make(chan int)
@@ -231,6 +231,7 @@ func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Requ
 	select {
 	case <-ctx.Done():
 		// do nothing, let client.Do handle
+		err = fmt.Errorf("gofast: timeout or canceled")
 	case <-done:
 		// do nothing and end the function
 	}
@@ -267,7 +268,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
 	// create response pipe
 	resp = NewResponsePipe()
-	writeError, allDone := make(chan error), make(chan int)
+	rwError, allDone := make(chan error), make(chan int)
 
 	// check if connection exists
 	if c.conn == nil {
@@ -293,16 +294,20 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 
 	// Run read and write in parallel.
 	// Note: Specification never said "write before read".
+
+	// write the request through request pipe
 	go func() {
 		if err := c.writeRequest(reqID, req); err != nil {
-			writeError <- err
+			rwError <- err
 		}
 		wg.Done()
 	}()
 
-	// get response in a goroutine and send to response pipe
+	// get response from client and write through response pipe
 	go func() {
-		c.readResponse(ctx, resp, req)
+		if err := c.readResponse(ctx, resp, req); err != nil {
+			rwError <- err
+		}
 		wg.Done()
 	}()
 
@@ -312,21 +317,23 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 	go func() {
 		// wait until context deadline
 		// or until writeError is not blocked.
-		select {
-		case <-ctx.Done():
-			// write error to err writer
-			resp.stdErrWriter.Write([]byte("gofast: timeout or canceled"))
-		case err := <-writeError:
-			// write error to err writer
-			resp.stdErrWriter.Write([]byte(err.Error()))
-		case <-allDone:
-			// do nothing
+	loop:
+		for {
+			select {
+			case err := <-rwError:
+				// pass the read / write error to error stream
+				resp.stdErrWriter.Write([]byte(err.Error()))
+				continue
+			case <-allDone:
+				break loop
+				// do nothing
+			}
 		}
 
 		// clean up
 		c.ids.Release(reqID)
 		resp.Close()
-		close(writeError)
+		close(rwError)
 	}()
 	return
 }
