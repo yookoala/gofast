@@ -278,7 +278,7 @@ func MapEndpoint(endpointFile string) Middleware {
 	return func(inner SessionHandler) SessionHandler {
 		return func(client Client, req *Request) (*ResponsePipe, error) {
 			r := req.Raw
-			req.Params["REQUEST_URI"] = webpath + r.URL.RequestURI()
+			req.Params["REQUEST_URI"] = r.URL.RequestURI()
 			req.Params["SCRIPT_NAME"] = webpath
 			req.Params["SCRIPT_FILENAME"] = endpointFile
 			req.Params["DOCUMENT_URI"] = r.URL.Path
