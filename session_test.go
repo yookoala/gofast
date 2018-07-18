@@ -92,6 +92,29 @@ func (vfs VFS) Open(name string) (f http.File, err error) {
 	return
 }
 
+func TestMapRemoteHost(t *testing.T) {
+	r, _ := http.NewRequest("GET", "http://foobar.com/hello/world", nil)
+	r.RemoteAddr = "8.8.8.8:12345" // google-public-dns-a.google.com
+	c := gofast.ClientFunc(func(req *gofast.Request) (resp *gofast.ResponsePipe, err error) {
+		return
+	})
+	inner := func(client gofast.Client, req *gofast.Request) (resp *gofast.ResponsePipe, err error) {
+		if remoteHost, ok := req.Params["REMOTE_HOST"]; !ok {
+			t.Error("filter request requries param FCGI_DATA_LAST_MOD")
+		} else if want, have := "google-public-dns-a.google.com", remoteHost; want != have {
+			t.Errorf("expected %#v, got %#v", want, have)
+		}
+		return
+	}
+	sess := gofast.MapRemoteHost(inner)
+
+	_, err := sess(c, gofast.NewRequest(r))
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+		return
+	}
+}
+
 func TestMapFilterRequest(t *testing.T) {
 
 	dummyModTime := time.Now().Add(-10 * time.Second)

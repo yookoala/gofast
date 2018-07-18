@@ -133,6 +133,20 @@ func BasicParamsMap(inner SessionHandler) SessionHandler {
 	}
 }
 
+// MapRemoteHost does reverse DNS lookup on the r.RemoteAddr IP
+// address.
+func MapRemoteHost(inner SessionHandler) SessionHandler {
+	return func(client Client, req *Request) (*ResponsePipe, error) {
+		r := req.Raw
+		remoteAddr, _, _ := net.SplitHostPort(r.RemoteAddr)
+		names, _ := net.LookupAddr(remoteAddr)
+		if len(names) > 0 {
+			req.Params["REMOTE_HOST"] = strings.TrimRight(names[0], ".")
+		}
+		return inner(client, req)
+	}
+}
+
 // FilterAuthReqParams filter out FCGI_PARAMS key-value that is explicitly
 // forbidden to passed on in factcgi specification, include:
 //  CONTENT_LENGTH;
