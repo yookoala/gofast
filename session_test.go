@@ -92,28 +92,6 @@ func (vfs VFS) Open(name string) (f http.File, err error) {
 	return
 }
 
-func NopClient(id uint16) gofast.Client {
-	return nopClient(id)
-}
-
-type nopClient uint16
-
-func (nopClient) Do(req *gofast.Request) (resp *gofast.ResponsePipe, err error) {
-	return
-}
-
-func (nc nopClient) AllocID() uint16 {
-	return uint16(nc)
-}
-
-func (nopClient) ReleaseID(uint16) {
-
-}
-
-func (nopClient) Close() error {
-	return nil
-}
-
 func TestMapFilterRequest(t *testing.T) {
 
 	dummyModTime := time.Now().Add(-10 * time.Second)
@@ -169,7 +147,9 @@ func TestMapFilterRequest(t *testing.T) {
 		t.Errorf("unexpected error: %s", err)
 		return
 	}
-	c := NopClient(1)
+	c := gofast.ClientFunc(func(req *gofast.Request) (resp *gofast.ResponsePipe, err error) {
+		return
+	})
 	_, err = sess(c, gofast.NewRequest(r))
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
