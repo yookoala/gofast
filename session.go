@@ -54,7 +54,11 @@ type SessionHandler func(client Client, req *Request) (resp *ResponsePipe, err e
 //
 type Middleware func(SessionHandler) SessionHandler
 
-// Chain chains middlewares into a single middleware
+// Chain chains middlewares into a single middleware.
+//
+// The middlewares will be chained from outer to inner. The first
+// middleware will be the first to handle Client and Request. It
+// is also the last to handle ResponsePipe and error.
 func Chain(middlewares ...Middleware) Middleware {
 	if len(middlewares) == 0 {
 		return nil
