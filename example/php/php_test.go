@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yookoala/gophpfpm"
+	"github.com/yookoala/gofast/tools/phpfpm"
 
 	"github.com/yookoala/gofast/example/php"
 )
@@ -19,7 +19,15 @@ import (
 var username, phpfpmPath, phpfpmListen string
 
 func init() {
-	phpfpmPath = os.Getenv("TEST_PHPFPM_PATH")
+	var err error
+
+	// defined in environment
+	if phpfpmPath = os.Getenv("TEST_PHPFPM_PATH"); phpfpmPath != "" {
+		// do nothing
+	} else if phpfpmPath, err = phpfpm.FindBinary(phpfpm.ReadPaths(os.Getenv("PATH"))...); err != nil {
+		panic(err)
+	}
+
 	phpfpmListen = os.Getenv("TEST_PHPFPM_LISTEN")
 	username = os.Getenv("USER")
 }
@@ -101,7 +109,7 @@ func TestHandler(t *testing.T) {
 	}
 
 	exmpPath := examplePath()
-	process := gophpfpm.NewProcess(phpfpmPath)
+	process := phpfpm.NewProcess(phpfpmPath)
 	process.SetDatadir(path.Join(exmpPath, "var"))
 	process.User = username
 	process.SaveConfig(path.Join(exmpPath, "etc", "test.handler.conf"))

@@ -24,7 +24,7 @@ $entityBody = file_get_contents('php://input');
 <textarea>
 file_get_contents("php://input") = <?php var_export($entityBody); ?>;
 
-$HTTP_RAW_POST_DATA = <?php var_export($HTTP_RAW_POST_DATA); ?>;
+$HTTP_RAW_POST_DATA = <?php var_export(file_get_contents('php://input')); ?>;
 
 $_SERVER = <?php var_export($_SERVER); ?>;
 
