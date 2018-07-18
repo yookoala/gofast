@@ -63,6 +63,30 @@ func examplePath() string {
 	panic("example path not found")
 }
 
+func get(h http.Handler, path string) (w *httptest.ResponseRecorder, err error) {
+	r, err := http.NewRequest("GET", path, nil)
+	if err != nil {
+		return
+	}
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	return
+}
+
+func post(h http.Handler, path string, payload string) (w *httptest.ResponseRecorder, err error) {
+	var reader io.Reader
+	reader = strings.NewReader(payload)
+	r, err := http.NewRequest("POST", path, reader)
+	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	r.Header.Add("Content-Length", fmt.Sprintf("%d", len(payload)))
+	if err != nil {
+		return
+	}
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	return
+}
+
 func TestHandler(t *testing.T) {
 
 	if phpfpmPath == "" {
@@ -93,32 +117,8 @@ func TestHandler(t *testing.T) {
 		path.Join(exmpPath, "htdocs"),
 		network, address)
 
-	get := func(path string) (w *httptest.ResponseRecorder, err error) {
-		r, err := http.NewRequest("GET", path, nil)
-		if err != nil {
-			return
-		}
-		w = httptest.NewRecorder()
-		h.ServeHTTP(w, r)
-		return
-	}
-
-	post := func(path string, payload string) (w *httptest.ResponseRecorder, err error) {
-		var reader io.Reader
-		reader = strings.NewReader(payload)
-		r, err := http.NewRequest("POST", path, reader)
-		r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		r.Header.Add("Content-Length", fmt.Sprintf("%d", len(payload)))
-		if err != nil {
-			return
-		}
-		w = httptest.NewRecorder()
-		h.ServeHTTP(w, r)
-		return
-	}
-
 	// check results
-	w, err := get("/")
+	w, err := get(h, "/")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 		return
@@ -133,7 +133,7 @@ func TestHandler(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
 
-	w, err = get("/index.php")
+	w, err = get(h, "/index.php")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 		return
@@ -142,7 +142,7 @@ func TestHandler(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
 
-	w, err = get("/form.php")
+	w, err = get(h, "/form.php")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 		return
@@ -152,7 +152,7 @@ func TestHandler(t *testing.T) {
 		t.Errorf("expected to start with %#v, got %#v", formPrefix, have)
 	}
 
-	w, err = get("/form.php?hello=world")
+	w, err = get(h, "/form.php?hello=world")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 		return
@@ -163,7 +163,7 @@ func TestHandler(t *testing.T) {
 
 	form := url.Values{}
 	form.Add("text_input", "hello world")
-	w, err = post("/form.php", form.Encode())
+	w, err = post(h, "/form.php", form.Encode())
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 		return
