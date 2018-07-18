@@ -19,6 +19,9 @@ import (
 // that runs only 1 pool
 type Process struct {
 
+	// basename for pid / sock / log filename
+	Name string
+
 	// path to php-fpm executable
 	Exec string
 
@@ -46,6 +49,7 @@ type Process struct {
 // NewProcess creates a new process descriptor
 func NewProcess(phpFpm string) *Process {
 	return &Process{
+		Name: "phpfpm",
 		Exec: phpFpm,
 	}
 }
@@ -67,30 +71,32 @@ func (proc *Process) Config() (f *ini.File) {
 	f.Section("global").NewKey("error_log", proc.ErrorLog)
 	f.NewSection("www")
 	f.Section("www").NewKey("listen", proc.Listen)
-	f.Section("www").NewKey("pm", "dynamic")
-	f.Section("www").NewKey("pm.max_children", "5")
-	f.Section("www").NewKey("pm.start_servers", "2")
-	f.Section("www").NewKey("pm.min_spare_servers", "1")
-	f.Section("www").NewKey("pm.max_spare_servers", "3")
+	f.Section("www").NewKey("pm", "static")
+	f.Section("www").NewKey("pm.max_children", "10")
 	if proc.User != "" {
 		f.Section("www").NewKey("user", proc.User)
 	}
 	return
 }
 
+// SetName sets the base name for pid, error_log and sock file.
+func (proc *Process) SetName(name string) {
+	proc.Name = name
+}
+
 // SetDatadir sets default config values according
 // with reference to the folder prefix
 //
 // Equals to running these 3 statements:
-//   process.PidFile  = basepath + "/phpfpm.pid"
-//   process.ErrorLog = basepath + "/phpfpm.error_log"
-//   process.Listen   = basepath + "/phpfpm.sock"
+//   process.PidFile  = prefix + "/" + proc.Name ".pid"
+//   process.ErrorLog = prefix + "/" + proc.Name ".error_log"
+//   process.Listen   = prefix + "/" + proc.Name ".sock"
 func (proc *Process) SetDatadir(prefix string) {
 	// FIXME: add error if the prefix folder doesn't exists
 	// or is not a folder
-	proc.PidFile = path.Join(prefix, "phpfpm.pid")
-	proc.ErrorLog = path.Join(prefix, "phpfpm.error_log")
-	proc.Listen = path.Join(prefix, "phpfpm.sock")
+	proc.PidFile = path.Join(prefix, proc.Name+".pid")
+	proc.ErrorLog = path.Join(prefix, proc.Name+".error_log")
+	proc.Listen = path.Join(prefix, proc.Name+".sock")
 }
 
 // Start starts the php-fpm process

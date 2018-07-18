@@ -17,7 +17,7 @@ import (
 	"github.com/yookoala/gofast/tools/phpfpm"
 )
 
-var username, phpfpmPath, phpfpmListen string
+var username, phpfpmPath string
 
 func init() {
 	var err error
@@ -28,8 +28,6 @@ func init() {
 	} else if phpfpmPath, err = phpfpm.FindBinary(phpfpm.ReadPaths(os.Getenv("PATH"))...); err != nil {
 		panic(err)
 	}
-
-	phpfpmListen = os.Getenv("TEST_PHPFPM_LISTEN")
 	username = os.Getenv("USER")
 }
 
@@ -96,8 +94,7 @@ func post(h http.Handler, path string, payload string) (w *httptest.ResponseReco
 	return
 }
 
-func TestNewSimpleHandler(t *testing.T) {
-
+func initEnv(t *testing.T, name string) (exmpPath string, process *phpfpm.Process) {
 	if phpfpmPath == "" {
 		t.Skip("empty TEST_PHPFPM_PATH, skip test")
 	}
@@ -109,8 +106,9 @@ func TestNewSimpleHandler(t *testing.T) {
 		return
 	}
 
-	exmpPath := examplePath()
-	process := phpfpm.NewProcess(phpfpmPath)
+	exmpPath = examplePath()
+	process = phpfpm.NewProcess(phpfpmPath)
+	process.SetName(name)
 	process.SetDatadir(path.Join(exmpPath, "var"))
 	process.User = username
 	process.SaveConfig(path.Join(exmpPath, "etc", "test.handler.conf"))
@@ -118,6 +116,12 @@ func TestNewSimpleHandler(t *testing.T) {
 		t.Errorf("unexpected error: %s", err.Error())
 		return
 	}
+
+	return
+}
+func TestNewSimpleHandler(t *testing.T) {
+
+	exmpPath, process := initEnv(t, "phpfpm1")
 	defer process.Stop()
 
 	// start the proxy handler
@@ -184,26 +188,7 @@ func TestNewSimpleHandler(t *testing.T) {
 
 func TestNewSimpleHandler__ErrorStream(t *testing.T) {
 
-	if phpfpmPath == "" {
-		t.Skip("empty TEST_PHPFPM_PATH, skip test")
-	}
-	if stat, err := os.Stat(phpfpmPath); os.IsNotExist(err) {
-		t.Errorf("TEST_PHPFPM_PATH (%#v) not found", phpfpmPath)
-		return
-	} else if fmode := stat.Mode(); !fmode.IsRegular() {
-		t.Errorf("TEST_PHPFPM_PATH (%#v) is not a regular file", phpfpmPath)
-		return
-	}
-
-	exmpPath := examplePath()
-	process := phpfpm.NewProcess(phpfpmPath)
-	process.SetDatadir(path.Join(exmpPath, "var"))
-	process.User = username
-	process.SaveConfig(path.Join(exmpPath, "etc", "test.handler.conf"))
-	if err := process.Start(); err != nil {
-		t.Errorf("unexpected error: %s", err.Error())
-		return
-	}
+	exmpPath, process := initEnv(t, "phpfpm2")
 	defer process.Stop()
 
 	// start the proxy handler
@@ -234,26 +219,8 @@ func TestNewSimpleHandler__ErrorStream(t *testing.T) {
 }
 
 func TestNewFileEndpointHandler(t *testing.T) {
-	if phpfpmPath == "" {
-		t.Skip("empty TEST_PHPFPM_PATH, skip test")
-	}
-	if stat, err := os.Stat(phpfpmPath); os.IsNotExist(err) {
-		t.Errorf("TEST_PHPFPM_PATH (%#v) not found", phpfpmPath)
-		return
-	} else if fmode := stat.Mode(); !fmode.IsRegular() {
-		t.Errorf("TEST_PHPFPM_PATH (%#v) is not a regular file", phpfpmPath)
-		return
-	}
 
-	exmpPath := examplePath()
-	process := phpfpm.NewProcess(phpfpmPath)
-	process.SetDatadir(path.Join(exmpPath, "var"))
-	process.User = username
-	process.SaveConfig(path.Join(exmpPath, "etc", "test.handler.conf"))
-	if err := process.Start(); err != nil {
-		t.Errorf("unexpected error: %s", err.Error())
-		return
-	}
+	exmpPath, process := initEnv(t, "phpfpm3")
 	defer process.Stop()
 
 	// start the proxy handler
