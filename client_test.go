@@ -188,7 +188,7 @@ func TestClient_StdErr(t *testing.T) {
 		}
 		req := gofast.NewRequest(nil)
 
-		// Some required paramters with invalid values
+		// Some required parameters with invalid values
 		req.Params["REQUEST_METHOD"] = ""
 		req.Params["SERVER_PROTOCOL"] = ""
 

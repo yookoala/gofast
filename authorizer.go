@@ -114,7 +114,7 @@ func (ar Authorizer) Wrap(inner http.Handler) http.Handler {
 
 			// if error stream is not empty
 			// also write to response
-			// TODO: add option to supress this?
+			// TODO: add option to suppress this?
 			if ew.Len() > 0 {
 				w.Header().Add("Content-Type", "text/html; charset=utf8")
 				w.WriteHeader(http.StatusInternalServerError)

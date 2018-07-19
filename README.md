@@ -98,7 +98,7 @@ func main() {
 
 ```
 
-### Advanced Example
+### Advanced Examples
 
 #### Normal PHP Application
 
