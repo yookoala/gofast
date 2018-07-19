@@ -314,6 +314,8 @@ func MapEndpoint(endpointFile string) Middleware {
 //
 // If the file do not exists or cannot be opened, the middleware
 // will return empty response pipe and the error.
+//
+// TODO: provide way to inject authorization check
 func MapFilterRequest(fs http.FileSystem) Middleware {
 	return func(inner SessionHandler) SessionHandler {
 		return func(client Client, req *Request) (*ResponsePipe, error) {

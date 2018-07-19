@@ -100,7 +100,7 @@ func TestMapRemoteHost(t *testing.T) {
 	})
 	inner := func(client gofast.Client, req *gofast.Request) (resp *gofast.ResponsePipe, err error) {
 		if remoteHost, ok := req.Params["REMOTE_HOST"]; !ok {
-			t.Error("filter request requries param FCGI_DATA_LAST_MOD")
+			t.Error("filter request requires param FCGI_DATA_LAST_MOD")
 		} else if want, have := "google-public-dns-a.google.com", remoteHost; want != have {
 			t.Errorf("expected %#v, got %#v", want, have)
 		}
@@ -140,7 +140,7 @@ func TestMapFilterRequest(t *testing.T) {
 		}
 
 		if req.Data == nil {
-			t.Error("filter request requries a data stream")
+			t.Error("filter request requires a data stream")
 		} else if content, err := ioutil.ReadAll(req.Data); err != nil {
 			t.Errorf("unexpected error: %s", err)
 		} else if want, have := "hello world", fmt.Sprintf("%s", content); want != have {
@@ -148,7 +148,7 @@ func TestMapFilterRequest(t *testing.T) {
 		}
 
 		if lastModStr, ok := req.Params["FCGI_DATA_LAST_MOD"]; !ok {
-			t.Error("filter request requries param FCGI_DATA_LAST_MOD")
+			t.Error("filter request requires param FCGI_DATA_LAST_MOD")
 		} else if lastMod, err := strconv.ParseInt(lastModStr, 10, 32); err != nil {
 			t.Errorf("invalid parsing FCGI_DATA_LAST_MOD (%s)", err)
 		} else if want, have := dummyModTime.Unix(), lastMod; want != have {
@@ -156,7 +156,7 @@ func TestMapFilterRequest(t *testing.T) {
 		}
 
 		if _, ok := req.Params["FCGI_DATA_LENGTH"]; !ok {
-			t.Error("filter request requries param FCGI_DATA_LENGTH")
+			t.Error("filter request requires param FCGI_DATA_LENGTH")
 		} else if _, err = strconv.ParseInt(req.Params["FCGI_DATA_LENGTH"], 10, 32); err != nil {
 			t.Errorf("invalid parsing FCGI_DATA_LENGTH (%s)", err)
 		}

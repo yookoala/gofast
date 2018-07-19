@@ -246,13 +246,13 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 	if req.Role == RoleFilter {
 		// validate the request
 		if req.Data == nil {
-			err = fmt.Errorf("filter request requries a data stream")
+			err = fmt.Errorf("filter request requires a data stream")
 		} else if _, ok := req.Params["FCGI_DATA_LAST_MOD"]; !ok {
-			err = fmt.Errorf("filter request requries param FCGI_DATA_LAST_MOD")
+			err = fmt.Errorf("filter request requires param FCGI_DATA_LAST_MOD")
 		} else if _, err = strconv.ParseUint(req.Params["FCGI_DATA_LAST_MOD"], 10, 32); err != nil {
 			err = fmt.Errorf("invalid parsing FCGI_DATA_LAST_MOD (%s)", err)
 		} else if _, ok := req.Params["FCGI_DATA_LENGTH"]; !ok {
-			err = fmt.Errorf("filter request requries param FCGI_DATA_LENGTH")
+			err = fmt.Errorf("filter request requires param FCGI_DATA_LENGTH")
 		} else if _, err = strconv.ParseUint(req.Params["FCGI_DATA_LENGTH"], 10, 32); err != nil {
 			err = fmt.Errorf("invalid parsing FCGI_DATA_LENGTH (%s)", err)
 		}
