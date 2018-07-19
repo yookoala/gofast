@@ -321,6 +321,54 @@ func main() {
 [fastcgi-authorizer]: http://www.mit.edu/~yandros/doc/specs/fcgi-spec.html#S6.3
 
 
+#### FastCGI Filter
+
+FastCGI specified a [filter role][fastcgi-filter] for filtering web server
+assets before sending out. As different from a usual FastCGI application
+(i.e. **responder**), the requested data is on the web server side. So the
+web server will pass those data to the application when requested.
+
+<details>
+<summary>Code</summary>
+<div>
+
+```go
+
+package main
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/yookoala/gofast"
+)
+
+func main() {
+	address := os.Getenv("FASTCGI_ADDR")
+	connFactory := gofast.SimpleConnFactory("tcp", address)
+	clientFactory := gofast.SimpleClientFactory(connFactory, 0)
+
+	// Note: The local file system "/var/www/html/" only need to be
+	// local to web server. No need for the FastCGI application to access
+	// it directly.
+	connFactory := gofast.SimpleConnFactory(network, address)
+	http.Handle("/", gofast.NewHandler(
+		gofast.NewFilterLocalFS("/var/www/html/")(gofast.BasicSession),
+		clientFactory,
+	))
+
+	// serve at 8080 port
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+```
+
+</div>
+</details>
+
+[fastcgi-filter]: http://www.mit.edu/~yandros/doc/specs/fcgi-spec.html#S6.4
+
+
 #### Pooling Clients
 
 To have a better, more controlled, scaling property, you may
