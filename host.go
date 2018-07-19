@@ -46,6 +46,7 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			err.Error())
 		return
 	}
+	defer c.Close()
 
 	// handle the session
 	resp, err := h.sessionHandler(c, NewRequest(r))
@@ -62,12 +63,5 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Printf("gofast: error stream from application process %s",
 			errBuffer.String())
 		return
-	}
-
-	// signal to close the client
-	// or the pool to return the client
-	if err = c.Close(); err != nil {
-		log.Printf("gofast: error closing client: %s",
-			err.Error())
 	}
 }
