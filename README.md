@@ -232,6 +232,95 @@ func main() {
 [gofast-file-endpoint]: https://godoc.org/github.com/yookoala/gofast#NewFileEndpoint
 [gofast-middleware]: https://godoc.org/github.com/yookoala/gofast#Middleware
 
+#### FastCGI Authorizer
+
+FastCGI specified an [authorizer role][fastcgi-authorizer] for authorizing
+an HTTP request with an "authorizer application". As different from a usual
+FastCGI application (i.e. **responder**), it only does authorization check.
+
+<details>
+<summary>Summary of Spec</summary>
+<div>
+
+Before actually serving an HTTP request, a web server can format a normal
+FastCGI request to the Authorizer application with only FastCGI parameters
+(`FCGI_PARAMS` stream). This application is responsible to determine if the
+request is properly authenticated and authorized for the request.
+
+If valid,
+
+* The authorizer application should response with HTTP status `200` (OK).
+
+* It may add additional variables (e.g. `SOME-HEADER`) to the subsequence
+  request by adding `Variable-SOME-HEADER` header field to its response to
+  web server.
+
+* The web server will create a new HTTP request from the old one, appending
+  the additional header variables (e.g. `Some-Header`), then send the modified
+  request to the subquence application.
+
+If invalid,
+
+* The authorizer application should response with HTTP status that is NOT
+  `200`, and the content to display for failed login.
+
+* The webserver will skip the responder and directly show the authorizer's
+  response.
+
+</div>
+</details>
+
+<details>
+<summary>Code</summary>
+<div>
+
+```go
+
+package main
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/yookoala/gofast"
+)
+
+func myApp() http.Handler {
+  // ... any normal http.Handler, using gofast or not
+	return h
+}
+
+func main() {
+	address := os.Getenv("FASTCGI_ADDR")
+	connFactory := gofast.SimpleConnFactory("tcp", address)
+	clientFactory := gofast.SimpleClientFactory(connFactory, 0)
+
+	// authorization with php
+	authSess := gofast.Chain(
+		gofast.NewAuthPrepare(),
+		gofast.NewFileEndpoint("/var/www/html/authorization.php"),
+	)(gofast.BasicSession)
+	authorizer := gofast.NewAuthorizer(
+		authSess,
+		gofast.SimpleConnFactory(network, address)
+	)
+
+	// wrap the actual app
+	http.Handle("/", authorizer.Wrap(myApp()))
+
+	// serve at 8080 port
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+```
+
+</div>
+</details>
+
+
+[fastcgi-authorizer]: http://www.mit.edu/~yandros/doc/specs/fcgi-spec.html#S6.3
+
+
 #### Pooling Clients
 
 To have a better, more controlled, scaling property, you may
