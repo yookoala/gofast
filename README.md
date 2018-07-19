@@ -1,15 +1,16 @@
 # gofast [![GoDoc][godoc-badge]][godoc] [![Go Report Card][goreport-badge]][goreport] [![Travis CI results][travis-badge]][travis]
 
-**gofast** is a [FastCGI][fastcgi]
-"client" library written purely in go.
+**gofast** is a [FastCGI][fastcgi] "client" library written purely in
+[golang][golang].
 
 [fastcgi]: http://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
 [godoc]: https://godoc.org/github.com/yookoala/gofast
 [godoc-badge]: https://godoc.org/github.com/yookoala/gofast?status.svg
 [travis]: https://travis-ci.org/yookoala/gofast?branch=master
 [travis-badge]: https://api.travis-ci.org/yookoala/gofast.svg?branch=master
-[goreport]: (https://goreportcard.com/report/github.com/yookoala/gofast)
+[goreport]: https://goreportcard.com/report/github.com/yookoala/gofast
 [goreport-badge]: https://goreportcard.com/badge/github.com/yookoala/gofast
+[golang]: https://golang.org
 
 ## What does it do, really?
 
@@ -19,28 +20,23 @@ request information to the application server through socket. The
 application server always listens to the socket and response to
 socket request accordingly.
 
-```
-visitor → web server → application server → web server → visitor
-```
+[![visitor → web server → application server → web server → visitor][fastcgi-illustration]][fastcgi-illustration]
 
-In ordinary Apache + php-fpm hosting environment, this would be:
-```
-visitor → Apache → php-fpm → Apache → visitor
-```
+[fastcgi-illustration]: docs/fastcgi-illustration.svg
 
-**gofast** help you to write the code on the web server part of this
+**gofast** help you to write the code on the **web server** part of this
 picture. It helps you to pass the request to application server and
 receive response from it.
 
 You may think of **gofast** as a "client library" to consume
 any FastCGI application server.
 
-Why?
-----
+## Why?
+
 Many popular languages (e.g. [Python][python/webservers],
-[PHP][php-fpm], [nodejs][node-fastcgi]) has FastCGI server
-implementations. With **gofast**, you may mix the languages
-without too much complication.
+[PHP][php-fpm], [nodejs][node-fastcgi]) has FastCGI application
+server implementations. With **gofast**, you may mix using the languages
+in a simple way.
 
 Also, this is fun to do :-)
 
