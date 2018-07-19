@@ -80,7 +80,7 @@ func TestClient_canceled(t *testing.T) {
 		)()
 		if err != nil {
 			http.Error(w, "failed to connect to FastCGI application", http.StatusBadGateway)
-			log.Printf("web server: unable to connect to FastCGI application "+
+			t.Logf("web server: unable to connect to FastCGI application "+
 				"(network=%#v, address=%#v, error=%#v)",
 				p.network, p.address, err.Error())
 			return
@@ -104,7 +104,7 @@ func TestClient_canceled(t *testing.T) {
 		resp, err := c.Do(req)
 		if err != nil {
 			http.Error(w, "failed to process request", http.StatusInternalServerError)
-			log.Printf("web server: unable to process request "+
+			t.Logf("web server: unable to process request "+
 				"(network=%#v, address=%#v, error=%#v)",
 				p.network, p.address, err.Error())
 		}
@@ -114,7 +114,7 @@ func TestClient_canceled(t *testing.T) {
 
 		if errBuffer.Len() > 0 {
 			errStr = errBuffer.String()
-			log.Printf("web server: error stream from application process "+
+			t.Logf("web server: error stream from application process "+
 				"(network=%#v, address=%#v, error=%#v)",
 				p.network, p.address, errStr)
 			return
@@ -132,11 +132,12 @@ func TestClient_canceled(t *testing.T) {
 
 	// create temporary fcgi application server
 	// that listens to the socket
-	fn := func(w http.ResponseWriter, r *http.Request) {
+	l, err := newApp("unix", sock, func(w http.ResponseWriter, r *http.Request) {
 		t.Logf("accessing FastCGI process")
+		time.Sleep(10 * time.Second) // mimic long running process
 		fmt.Fprintf(w, "hello world")
-	}
-	l, err := newApp("unix", sock, fn)
+		t.Logf("FastCGI process finished")
+	})
 	if err != nil {
 		t.Errorf("unexpected error: %#v", err.Error())
 	}
@@ -150,6 +151,11 @@ func TestClient_canceled(t *testing.T) {
 	r, err := http.NewRequest("GET", "/add", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %#v", err.Error())
+	}
+
+	// test response
+	if want, have := "", w.Body.String(); want != have {
+		t.Errorf("expected %#v, got %#v", want, have)
 	}
 
 	// test error
@@ -182,7 +188,7 @@ func TestClient_StdErr(t *testing.T) {
 		}
 		req := gofast.NewRequest(nil)
 
-		// Some required paramters with invalid values
+		// Some required parameters with invalid values
 		req.Params["REQUEST_METHOD"] = ""
 		req.Params["SERVER_PROTOCOL"] = ""
 
@@ -190,7 +196,7 @@ func TestClient_StdErr(t *testing.T) {
 		resp, err := c.Do(req)
 		if err != nil {
 			http.Error(w, "failed to process request", http.StatusInternalServerError)
-			log.Printf("web server: unable to process request "+
+			t.Logf("web server: unable to process request "+
 				"(network=%#v, address=%#v, error=%#v)",
 				p.network, p.address, err.Error())
 			return
@@ -200,7 +206,7 @@ func TestClient_StdErr(t *testing.T) {
 
 		if errBuffer.Len() > 0 {
 			errStr = errBuffer.String()
-			log.Printf("web server: error stream from application process "+
+			t.Logf("web server: error stream from application process "+
 				"(network=%#v, address=%#v, error=%#v)",
 				p.network, p.address, errStr)
 			return

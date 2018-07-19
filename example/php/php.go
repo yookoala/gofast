@@ -7,7 +7,9 @@ import (
 	"github.com/yookoala/gofast"
 )
 
-// NewHandler returns a fastcgi web server implementation as an http.Handler
+// NewSimpleHandler returns a fastcgi web server implementation as an http.Handler
+// that functions like a traditional file based PHP hosting.
+//
 // Please note that this handler doesn't handle the fastcgi application process.
 // You'd need to start it with other means.
 //
@@ -16,7 +18,7 @@ import (
 //          or if it is a unix socket, "unix"
 // address: IP address and port, or the socket physical address of the fastcgi
 //          application.
-func NewHandler(docroot, network, address string) http.Handler {
+func NewSimpleHandler(docroot, network, address string) http.Handler {
 	connFactory := gofast.SimpleConnFactory(network, address)
 	pool := gofast.NewClientPool(
 		gofast.SimpleClientFactory(connFactory, 0),
@@ -25,6 +27,31 @@ func NewHandler(docroot, network, address string) http.Handler {
 	)
 	h := gofast.NewHandler(
 		gofast.NewPHPFS(docroot)(gofast.BasicSession),
+		pool.CreateClient,
+	)
+	return h
+}
+
+// NewFileEndpointHandler returns a fastcgi web server implementation as an
+// http.Handler that referers to a single backend PHP script.
+//
+// Please note that this handler doesn't handle the fastcgi application process.
+// You'd need to start it with other means.
+//
+// filepath: the path to the endpoint PHP file.
+// network:  network protocol (tcp / tcp4 / tcp6)
+//           or if it is a unix socket, "unix"
+// address:  IP address and port, or the socket physical address of the fastcgi
+//           application.
+func NewFileEndpointHandler(filepath, network, address string) http.Handler {
+	connFactory := gofast.SimpleConnFactory(network, address)
+	pool := gofast.NewClientPool(
+		gofast.SimpleClientFactory(connFactory, 0),
+		10,
+		60*time.Second,
+	)
+	h := gofast.NewHandler(
+		gofast.NewFileEndpoint(filepath)(gofast.BasicSession),
 		pool.CreateClient,
 	)
 	return h
