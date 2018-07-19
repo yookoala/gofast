@@ -3,6 +3,23 @@
 **gofast** is a [FastCGI][fastcgi] "client" library written purely in
 [golang][golang].
 
+## Contents
+
+* [What does it do, really?](#what-does-it-do-really)
+* [Why?](#why)
+* [How to Use?](#how-to-use)
+  * [Simple Example](#simple-example)
+  * [Advanced Examples](#advanced-examples)
+    * [Normal PHP Application](#normal-php-application)
+    * [Customizing Request Session with Middleware](#customizing-request-session-with-middleware)
+    * [FastCGI Authorizer](#fastcgi-authorizer)
+    * [FastCGI Filter](#fastcgi-filter)
+    * [Pooling Clients](#pooling-clients)
+  * [Full Examples](#full-examples)
+* [Author](#author)
+* [Contributing](#contributing)
+* [Licence](#licence)
+
 [fastcgi]: http://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
 [godoc]: https://godoc.org/github.com/yookoala/gofast
 [godoc-badge]: https://godoc.org/github.com/yookoala/gofast?status.svg
@@ -432,7 +449,7 @@ Please see the example usages:
 [nodejs]: example/nodejs
 
 
-### Author
+## Author
 
 This library is written by [Koala Yeung][author@github].
 
