@@ -94,7 +94,7 @@ func post(h http.Handler, path string, payload string) (w *httptest.ResponseReco
 	return
 }
 
-func initEnv(t *testing.T, name string) (exmpPath string, process *phpfpm.Process) {
+func initEnv(t *testing.T, name string, worker int) (exmpPath string, process *phpfpm.Process) {
 	if phpfpmPath == "" {
 		t.Skip("empty TEST_PHPFPM_PATH, skip test")
 	}
@@ -109,6 +109,7 @@ func initEnv(t *testing.T, name string) (exmpPath string, process *phpfpm.Proces
 	exmpPath = examplePath()
 	process = phpfpm.NewProcess(phpfpmPath)
 	process.SetName(name)
+	process.SetWorker(worker)
 	process.SetDatadir(path.Join(exmpPath, "var"))
 	process.User = username
 	process.SaveConfig(path.Join(exmpPath, "etc", "test.handler.conf"))
@@ -121,7 +122,7 @@ func initEnv(t *testing.T, name string) (exmpPath string, process *phpfpm.Proces
 }
 func TestNewSimpleHandler(t *testing.T) {
 
-	exmpPath, process := initEnv(t, "phpfpm1")
+	exmpPath, process := initEnv(t, "phpfpm1", 10)
 	defer process.Stop()
 
 	// start the proxy handler
@@ -188,7 +189,7 @@ func TestNewSimpleHandler(t *testing.T) {
 
 func TestNewSimpleHandler__ErrorStream(t *testing.T) {
 
-	exmpPath, process := initEnv(t, "phpfpm2")
+	exmpPath, process := initEnv(t, "phpfpm2", 1) // 1 worker to test regression
 	defer process.Stop()
 
 	// start the proxy handler
@@ -220,7 +221,7 @@ func TestNewSimpleHandler__ErrorStream(t *testing.T) {
 
 func TestNewFileEndpointHandler(t *testing.T) {
 
-	exmpPath, process := initEnv(t, "phpfpm3")
+	exmpPath, process := initEnv(t, "phpfpm3", 10)
 	defer process.Stop()
 
 	// start the proxy handler

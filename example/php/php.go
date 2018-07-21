@@ -2,7 +2,6 @@ package php
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/yookoala/gofast"
 )
@@ -20,14 +19,9 @@ import (
 //          application.
 func NewSimpleHandler(docroot, network, address string) http.Handler {
 	connFactory := gofast.SimpleConnFactory(network, address)
-	pool := gofast.NewClientPool(
-		gofast.SimpleClientFactory(connFactory, 0),
-		10,
-		60*time.Second,
-	)
 	h := gofast.NewHandler(
 		gofast.NewPHPFS(docroot)(gofast.BasicSession),
-		pool.CreateClient,
+		gofast.SimpleClientFactory(connFactory, 0),
 	)
 	return h
 }
@@ -45,14 +39,9 @@ func NewSimpleHandler(docroot, network, address string) http.Handler {
 //           application.
 func NewFileEndpointHandler(filepath, network, address string) http.Handler {
 	connFactory := gofast.SimpleConnFactory(network, address)
-	pool := gofast.NewClientPool(
-		gofast.SimpleClientFactory(connFactory, 0),
-		10,
-		60*time.Second,
-	)
 	h := gofast.NewHandler(
 		gofast.NewFileEndpoint(filepath)(gofast.BasicSession),
-		pool.CreateClient,
+		gofast.SimpleClientFactory(connFactory, 0),
 	)
 	return h
 }
