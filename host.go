@@ -47,6 +47,20 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// defer closing with error reporting
+	defer func() {
+		if c == nil {
+			return
+		}
+
+		// signal to close the client
+		// or the pool to return the client
+		if err = c.Close(); err != nil {
+			log.Printf("gofast: error closing client: %s",
+				err.Error())
+		}
+	}()
+
 	// handle the session
 	resp, err := h.sessionHandler(c, NewRequest(r))
 	if err != nil {
@@ -61,13 +75,5 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if errBuffer.Len() > 0 {
 		log.Printf("gofast: error stream from application process %s",
 			errBuffer.String())
-		return
-	}
-
-	// signal to close the client
-	// or the pool to return the client
-	if err = c.Close(); err != nil {
-		log.Printf("gofast: error closing client: %s",
-			err.Error())
 	}
 }
