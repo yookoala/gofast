@@ -31,6 +31,9 @@ type Process struct {
 	// username of the FastCGI process
 	User string
 
+	// number of concurrent worker
+	Worker int
+
 	// The address on which to accept FastCGI requests.
 	// Valid syntaxes are: 'ip.add.re.ss:port', 'port',
 	// '/path/to/unix/socket'. This option is mandatory for each pool.
@@ -49,8 +52,9 @@ type Process struct {
 // NewProcess creates a new process descriptor
 func NewProcess(phpFpm string) *Process {
 	return &Process{
-		Name: "phpfpm",
-		Exec: phpFpm,
+		Name:   "phpfpm",
+		Exec:   phpFpm,
+		Worker: 10,
 	}
 }
 
@@ -72,7 +76,7 @@ func (proc *Process) Config() (f *ini.File) {
 	f.NewSection("www")
 	f.Section("www").NewKey("listen", proc.Listen)
 	f.Section("www").NewKey("pm", "static")
-	f.Section("www").NewKey("pm.max_children", "10")
+	f.Section("www").NewKey("pm.max_children", fmt.Sprintf("%d", proc.Worker))
 	if proc.User != "" {
 		f.Section("www").NewKey("user", proc.User)
 	}
@@ -97,6 +101,11 @@ func (proc *Process) SetDatadir(prefix string) {
 	proc.PidFile = path.Join(prefix, proc.Name+".pid")
 	proc.ErrorLog = path.Join(prefix, proc.Name+".error_log")
 	proc.Listen = path.Join(prefix, proc.Name+".sock")
+}
+
+// SetWorker set number of workers for the php-fpm process
+func (proc *Process) SetWorker(worker int) {
+	proc.Worker = worker
 }
 
 // Start starts the php-fpm process
