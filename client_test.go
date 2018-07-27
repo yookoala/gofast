@@ -30,13 +30,13 @@ func newApp(network, address string, fn http.HandlerFunc) (l net.Listener, err e
 	return
 }
 
-func TestClient_canceled(t *testing.T) {
+// proxy implements Proxy interface
+type proxy struct {
+	network string
+	address string
+}
 
-	// proxy implements Proxy interface
-	type proxy struct {
-		network string
-		address string
-	}
+func testHandlerForCancel(t *testing.T, p *proxy, w http.ResponseWriter, r *http.Request) (errStr string) {
 
 	NewRequest := func(r *http.Request) (req *gofast.Request) {
 		var isHTTPS string
@@ -72,56 +72,56 @@ func TestClient_canceled(t *testing.T) {
 		return
 	}
 
-	// ServeHTTP implements http.Handler
-	ServeHTTP := func(p *proxy, w http.ResponseWriter, r *http.Request) (errStr string) {
-		c, err := gofast.SimpleClientFactory(
-			gofast.SimpleConnFactory(p.network, p.address),
-			0,
-		)()
-		if err != nil {
-			http.Error(w, "failed to connect to FastCGI application", http.StatusBadGateway)
-			t.Logf("web server: unable to connect to FastCGI application "+
-				"(network=%#v, address=%#v, error=%#v)",
-				p.network, p.address, err.Error())
-			return
-		}
-		innerCtx, cancel := context.WithCancel(r.Context())
-		req := NewRequest(r.WithContext(innerCtx))
-
-		// cancel before request
-		cancel()
-
-		// wait for the cancel signal to kick in
-		// or the artificial wait timeout
-		select {
-		case <-innerCtx.Done():
-			t.Logf("cancel effective")
-		case <-time.After(100 * time.Millisecond):
-			t.Logf("time out reach")
-		}
-
-		// handle the result
-		resp, err := c.Do(req)
-		if err != nil {
-			http.Error(w, "failed to process request", http.StatusInternalServerError)
-			t.Logf("web server: unable to process request "+
-				"(network=%#v, address=%#v, error=%#v)",
-				p.network, p.address, err.Error())
-		}
-
-		errBuffer := new(bytes.Buffer)
-		resp.WriteTo(w, errBuffer)
-
-		if errBuffer.Len() > 0 {
-			errStr = errBuffer.String()
-			t.Logf("web server: error stream from application process "+
-				"(network=%#v, address=%#v, error=%#v)",
-				p.network, p.address, errStr)
-			return
-		}
-
+	c, err := gofast.SimpleClientFactory(
+		gofast.SimpleConnFactory(p.network, p.address),
+		0,
+	)()
+	if err != nil {
+		http.Error(w, "failed to connect to FastCGI application", http.StatusBadGateway)
+		t.Logf("web server: unable to connect to FastCGI application "+
+			"(network=%#v, address=%#v, error=%#v)",
+			p.network, p.address, err.Error())
 		return
 	}
+	innerCtx, cancel := context.WithCancel(r.Context())
+	req := NewRequest(r.WithContext(innerCtx))
+
+	// cancel before request
+	cancel()
+
+	// wait for the cancel signal to kick in
+	// or the artificial wait timeout
+	select {
+	case <-innerCtx.Done():
+		t.Logf("cancel effective")
+	case <-time.After(100 * time.Millisecond):
+		t.Logf("time out reach")
+	}
+
+	// handle the result
+	resp, err := c.Do(req)
+	if err != nil {
+		http.Error(w, "failed to process request", http.StatusInternalServerError)
+		t.Logf("web server: unable to process request "+
+			"(network=%#v, address=%#v, error=%#v)",
+			p.network, p.address, err.Error())
+	}
+
+	errBuffer := new(bytes.Buffer)
+	resp.WriteTo(w, errBuffer)
+
+	if errBuffer.Len() > 0 {
+		errStr = errBuffer.String()
+		t.Logf("web server: error stream from application process "+
+			"(network=%#v, address=%#v, error=%#v)",
+			p.network, p.address, errStr)
+		return
+	}
+
+	return
+}
+
+func TestClient_canceled(t *testing.T) {
 
 	// create temporary socket in the testing folder
 	dir, err := os.Getwd()
@@ -160,7 +160,7 @@ func TestClient_canceled(t *testing.T) {
 
 	// test error
 	p := &proxy{l.Addr().Network(), l.Addr().String()}
-	if want, have := "gofast: timeout or canceled", ServeHTTP(p, w, r); want != have {
+	if want, have := "gofast: timeout or canceled", testHandlerForCancel(t, p, w, r); want != have {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
 }
