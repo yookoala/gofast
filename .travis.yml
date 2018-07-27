@@ -19,6 +19,7 @@ addons:
 env:
   global:
   - TEST_PHPFPM_PATH=/usr/sbin/php5-fpm
+  - GO111MODULE=on
 
 before_script:
   # for python3 tests
