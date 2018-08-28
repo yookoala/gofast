@@ -7,6 +7,7 @@ go:
   - 1.8.x
   - 1.9.x
   - 1.10.x
+  - 1.11.x
   - tip
 
 addons:
@@ -19,6 +20,7 @@ addons:
 env:
   global:
   - TEST_PHPFPM_PATH=/usr/sbin/php5-fpm
+  - GO111MODULE=on
 
 before_script:
   # for python3 tests
@@ -33,4 +35,5 @@ before_script:
   - cd ./example/nodejs && yarn install && cd ../..
 
 script:
+  - go mod download || go version
   - go test -v -race ./...
