@@ -101,7 +101,7 @@ func TestMapRemoteHost(t *testing.T) {
 	inner := func(client gofast.Client, req *gofast.Request) (resp *gofast.ResponsePipe, err error) {
 		if remoteHost, ok := req.Params["REMOTE_HOST"]; !ok {
 			t.Error("filter request requires param FCGI_DATA_LAST_MOD")
-		} else if want, have := "google-public-dns-a.google.com", remoteHost; want != have {
+		} else if want, have := "dns.google", remoteHost; want != have {
 			t.Errorf("expected %#v, got %#v", want, have)
 		}
 		return
