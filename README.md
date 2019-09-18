@@ -5,20 +5,22 @@
 
 ## Contents
 
-* [What does it do, really?](#what-does-it-do-really)
-* [Why?](#why)
-* [How to Use?](#how-to-use)
-  * [Simple Example](#simple-example)
-  * [Advanced Examples](#advanced-examples)
-    * [Normal PHP Application](#normal-php-application)
-    * [Customizing Request Session with Middleware](#customizing-request-session-with-middleware)
-    * [FastCGI Authorizer](#fastcgi-authorizer)
-    * [FastCGI Filter](#fastcgi-filter)
-    * [Pooling Clients](#pooling-clients)
-  * [Full Examples](#full-examples)
-* [Author](#author)
-* [Contributing](#contributing)
-* [Licence](#licence)
+- [gofast [![GoDoc][godoc-badge]][godoc] [![Go Report Card][goreport-badge]][goreport] [![Travis CI results][travis-badge]][travis]](#gofast-godocgodoc-badgegodoc-go-report-cardgoreport-badgegoreport-travis-ci-resultstravis-badgetravis)
+	- [Contents](#contents)
+	- [What does it do, really?](#what-does-it-do-really)
+	- [Why?](#why)
+	- [How to Use?](#how-to-use)
+		- [Simple Example](#simple-example)
+		- [Advanced Examples](#advanced-examples)
+			- [Normal PHP Application](#normal-php-application)
+			- [Customizing Request Session with Middleware](#customizing-request-session-with-middleware)
+			- [FastCGI Authorizer](#fastcgi-authorizer)
+			- [FastCGI Filter](#fastcgi-filter)
+			- [Pooling Clients](#pooling-clients)
+		- [Full Examples](#full-examples)
+	- [Author](#author)
+	- [Contributing](#contributing)
+	- [Licence](#licence)
 
 [fastcgi]: http://www.mit.edu/~yandros/doc/specs/fcgi-spec.html
 [godoc]: https://godoc.org/github.com/yookoala/gofast
@@ -146,7 +148,7 @@ func main() {
 	// handles static assets in the assets folder
 	http.Handle("/assets/",
 		http.StripPrefix("/assets/",
-			http.FileSystem(http.Dir("/var/www/html/assets"))))
+			http.FileServer(http.FileSystem(http.Dir("/var/www/html/assets")))))
 
 	// route all requests to relevant PHP file
 	http.Handle("/", gofast.NewHandler(
