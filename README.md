@@ -202,7 +202,7 @@ func main() {
 
 	// a custom authentication handler
 	customAuth := func(inner gofast.SessionHandler) gofast.SessionHandler {
-		return func(client gofast.Client, req *gofast.Request) (gofast.ResponsePipe, error) {
+		return func(client gofast.Client, req *gofast.Request) (*gofast.ResponsePipe, error) {
 			user, err := someCustomAuth(
 				req.Raw.Header.Get("Authorization"))
 			if err != nil {
