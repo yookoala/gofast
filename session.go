@@ -110,6 +110,7 @@ func BasicParamsMap(inner SessionHandler) SessionHandler {
 		remoteAddr, remotePort, _ := net.SplitHostPort(r.RemoteAddr)
 		host, serverPort, err := net.SplitHostPort(r.Host)
 		if err != nil {
+			host = r.Host
 			if isHTTPS {
 				serverPort = "443"
 			} else {
