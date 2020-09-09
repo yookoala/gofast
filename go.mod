@@ -1,5 +1,7 @@
 module github.com/yookoala/gofast
 
+go 1.7
+
 require (
 	github.com/go-ini/ini v1.38.1
 	github.com/go-restit/lzjson v0.0.0-20161206095556-efe3c53acc68
