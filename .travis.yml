@@ -17,13 +17,13 @@ go:
 addons:
   apt:
     packages:
-    - php5-fpm
+    - php-fpm
     - python3
     - python3.8-venv
 
 env:
   global:
-  - TEST_PHPFPM_PATH=/usr/sbin/php5-fpm
+  - TEST_PHPFPM_PATH=/usr/sbin/php-fpm7.4
   - GO111MODULE=on
 
 before_script:
