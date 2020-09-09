@@ -1,6 +1,6 @@
 language: go
 
-dist: trusty
+dist: focal
 
 go:
   - 1.7.x
@@ -19,7 +19,7 @@ addons:
     packages:
     - php5-fpm
     - python3
-    - python3.4-venv
+    - python3.8-venv
 
 env:
   global:
