@@ -34,8 +34,8 @@ before_script:
   - which pip3 && pip3 --version
   - pip3 install -r example/python3/requirements.txt
   # for nodejs tests
-  - curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.8/install.sh | bash
-  - nvm install 8 && npm install -g yarn
+  - curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.35.3/install.sh | bash
+  - cd ./example/nodejs && nvm install && npm install -g yarn && cd ../..
   - cd ./example/nodejs && yarn install && cd ../..
   # for go modules download, if applicable
   - go mod download -x || go mod download || go version
