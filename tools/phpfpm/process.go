@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-ini/ini"
+	"gopkg.in/ini.v1"
 )
 
 // Process describes a minimalistic php-fpm config
