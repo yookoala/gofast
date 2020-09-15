@@ -67,6 +67,13 @@ type idPool struct {
 	IDs chan uint16
 }
 
+// Close closes the IDs channel
+func (p *idPool) Close() {
+	if p.IDs != nil {
+		close(p.IDs)
+	}
+}
+
 // AllocID implements Client.AllocID
 func (p *idPool) Alloc() uint16 {
 	return <-p.IDs
@@ -98,6 +105,11 @@ func newIDs(limit uint32) (p idPool) {
 	// Ref: https://fast-cgi.github.io/spec#33-records
 	ids := make(chan uint16)
 	go func(maxID uint16) {
+		// Recover when IDs channel is closed
+		defer func() {
+			recover()
+		}()
+
 		for i := uint16(0); i < maxID; i++ {
 			ids <- i
 		}
@@ -342,6 +354,7 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 // If the inner connection has been closed before,
 // this method would do nothing and return nil
 func (c *client) Close() (err error) {
+	c.ids.Close()
 	if c.conn == nil {
 		return
 	}
