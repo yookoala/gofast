@@ -263,18 +263,18 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 		}
 	}
 
+	// check if connection exists
+	if c.conn == nil {
+		err = fmt.Errorf("client connection has been closed")
+		return
+	}
+
 	// allocate request ID
 	reqID := c.ids.Alloc()
 
 	// create response pipe
 	resp = NewResponsePipe()
 	rwError, allDone := make(chan error), make(chan int)
-
-	// check if connection exists
-	if c.conn == nil {
-		err = fmt.Errorf("client connection has been closed")
-		return
-	}
 
 	// if there is a raw request, use the context deadline
 	var ctx context.Context
