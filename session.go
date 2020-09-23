@@ -253,6 +253,12 @@ func MapHeader(inner SessionHandler) SessionHandler {
 	return func(client Client, req *Request) (*ResponsePipe, error) {
 		r := req.Raw
 
+		// Explicitly map raw host field because golang core library seems to remove
+		// the header field.
+		if r.Host != "" {
+			req.Params["HTTP_HOST"] = r.Host
+		}
+
 		// http header
 		for k, v := range r.Header {
 			formattedKey := strings.Replace(strings.ToUpper(k), "-", "_", -1)
