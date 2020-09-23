@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/http/fcgi"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -30,13 +30,48 @@ func newApp(network, address string, fn http.HandlerFunc) (l net.Listener, err e
 	return
 }
 
-// proxy implements Proxy interface
-type proxy struct {
-	network string
-	address string
+// appServer implements Proxy interface
+type appServer struct {
+	listener net.Listener
+	sock     string
 }
 
-func testHandlerForCancel(t *testing.T, p *proxy, w http.ResponseWriter, r *http.Request) (errStr string) {
+func (p *appServer) Network() string {
+	return p.listener.Addr().Network()
+}
+
+func (p *appServer) Address() string {
+	return p.listener.Addr().String()
+}
+
+func (p *appServer) Close() {
+	os.Remove(p.sock)
+	p.listener.Close()
+}
+
+func newAppServer(sockName string, fn http.HandlerFunc) (p *appServer, err error) {
+	// create temporary socket in the testing folder
+	dir, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	sock := filepath.Join(dir, sockName)
+
+	// create temporary fcgi application server
+	// that listens to the socket
+	l, err := newApp("unix", sock, fn)
+	if err != nil {
+		return
+	}
+
+	p = &appServer{
+		listener: l,
+		sock:     sock,
+	}
+	return
+}
+
+func testHandlerForCancel(t *testing.T, p *appServer, w http.ResponseWriter, r *http.Request) (errStr string) {
 
 	NewRequest := func(r *http.Request) (req *gofast.Request) {
 		var isHTTPS string
@@ -73,14 +108,14 @@ func testHandlerForCancel(t *testing.T, p *proxy, w http.ResponseWriter, r *http
 	}
 
 	c, err := gofast.SimpleClientFactory(
-		gofast.SimpleConnFactory(p.network, p.address),
+		gofast.SimpleConnFactory(p.Network(), p.Address()),
 		0,
 	)()
 	if err != nil {
 		http.Error(w, "failed to connect to FastCGI application", http.StatusBadGateway)
 		t.Logf("web server: unable to connect to FastCGI application "+
 			"(network=%#v, address=%#v, error=%#v)",
-			p.network, p.address, err.Error())
+			p.Network(), p.Address(), err.Error())
 		return
 	}
 	innerCtx, cancel := context.WithCancel(r.Context())
@@ -104,7 +139,7 @@ func testHandlerForCancel(t *testing.T, p *proxy, w http.ResponseWriter, r *http
 		http.Error(w, "failed to process request", http.StatusInternalServerError)
 		t.Logf("web server: unable to process request "+
 			"(network=%#v, address=%#v, error=%#v)",
-			p.network, p.address, err.Error())
+			p.Network(), p.Address(), err.Error())
 	}
 
 	errBuffer := new(bytes.Buffer)
@@ -114,7 +149,7 @@ func testHandlerForCancel(t *testing.T, p *proxy, w http.ResponseWriter, r *http
 		errStr = errBuffer.String()
 		t.Logf("web server: error stream from application process "+
 			"(network=%#v, address=%#v, error=%#v)",
-			p.network, p.address, errStr)
+			p.Network(), p.Address(), errStr)
 		return
 	}
 
@@ -123,16 +158,8 @@ func testHandlerForCancel(t *testing.T, p *proxy, w http.ResponseWriter, r *http
 
 func TestClient_canceled(t *testing.T) {
 
-	// create temporary socket in the testing folder
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Errorf("unexpected error: %#v", err.Error())
-	}
-	sock := dir + "/client.test.sock"
-
-	// create temporary fcgi application server
-	// that listens to the socket
-	l, err := newApp("unix", sock, func(w http.ResponseWriter, r *http.Request) {
+	// create a temp dummy fastcgi application server
+	p, err := newAppServer("client.test.sock", func(w http.ResponseWriter, r *http.Request) {
 		t.Logf("accessing FastCGI process")
 		time.Sleep(10 * time.Second) // mimic long running process
 		fmt.Fprintf(w, "hello world")
@@ -141,10 +168,9 @@ func TestClient_canceled(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %#v", err.Error())
 	}
-	defer os.Remove(sock)
-	defer l.Close()
+	defer p.Close()
 
-	// deine a proxy that access the temp fcgi application server
+	// deine a appServer that access the temp fcgi application server
 	w := httptest.NewRecorder()
 
 	// request the application server
@@ -159,7 +185,6 @@ func TestClient_canceled(t *testing.T) {
 	}
 
 	// test error
-	p := &proxy{l.Addr().Network(), l.Addr().String()}
 	if want, have := "gofast: timeout or canceled", testHandlerForCancel(t, p, w, r); want != have {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
@@ -167,23 +192,21 @@ func TestClient_canceled(t *testing.T) {
 
 func TestClient_StdErr(t *testing.T) {
 
-	// proxy implements Proxy interface
-	type proxy struct {
-		network string
-		address string
-	}
+	// create a temp dummy fastcgi application server
+	p, err := newAppServer("client.test.sock", func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("accessing FastCGI process")
+		fmt.Fprintf(w, "hello world")
+	})
+	defer p.Close()
 
-	// ServeHTTP implements http.Handler
-	ServeHTTP := func(p *proxy, w http.ResponseWriter, r *http.Request) (errStr string) {
+	// Do the actual request
+	doRequest := func(w http.ResponseWriter, r *http.Request) (errStr string) {
 		c, err := gofast.SimpleClientFactory(
-			gofast.SimpleConnFactory(p.network, p.address),
+			gofast.SimpleConnFactory(p.Network(), p.Address()),
 			0,
 		)()
 		if err != nil {
-			http.Error(w, "failed to connect to FastCGI application", http.StatusBadGateway)
-			log.Printf("web server: unable to connect to FastCGI application "+
-				"(network=%#v, address=%#v, error=%#v)",
-				p.network, p.address, err.Error())
+			errStr = "web server: unable to connect to FastCGI application: " + err.Error()
 			return
 		}
 		req := gofast.NewRequest(nil)
@@ -195,47 +218,21 @@ func TestClient_StdErr(t *testing.T) {
 		// handle the result
 		resp, err := c.Do(req)
 		if err != nil {
-			http.Error(w, "failed to process request", http.StatusInternalServerError)
-			t.Logf("web server: unable to process request "+
-				"(network=%#v, address=%#v, error=%#v)",
-				p.network, p.address, err.Error())
+			errStr = "web server: unable to connect to process request: " + err.Error()
 			return
 		}
 		errBuffer := new(bytes.Buffer)
 		resp.WriteTo(w, errBuffer)
 
 		if errBuffer.Len() > 0 {
+			// direct return the error stream
 			errStr = errBuffer.String()
-			t.Logf("web server: error stream from application process "+
-				"(network=%#v, address=%#v, error=%#v)",
-				p.network, p.address, errStr)
 			return
 		}
-
 		return
 	}
 
-	// create temporary socket in the testing folder
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Errorf("unexpected error: %#v", err.Error())
-	}
-	sock := dir + "/client.test.sock"
-
-	// create temporary fcgi application server
-	// that listens to the socket
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		t.Logf("accessing FastCGI process")
-		fmt.Fprintf(w, "hello world")
-	}
-	l, err := newApp("unix", sock, fn)
-	if err != nil {
-		t.Errorf("unexpected error: %#v", err.Error())
-	}
-	defer os.Remove(sock)
-	defer l.Close()
-
-	// deine a proxy that access the temp fcgi application server
+	// define an appServer that access the temp fcgi application server
 	w := httptest.NewRecorder()
 
 	// request the application server
@@ -244,8 +241,8 @@ func TestClient_StdErr(t *testing.T) {
 		t.Errorf("unexpected error: %#v", err.Error())
 	}
 
-	p := &proxy{l.Addr().Network(), l.Addr().String()}
-	if want, have := "cgi: no REQUEST_METHOD in environment", ServeHTTP(p, w, r); want != have {
+	if want, have := "cgi: no REQUEST_METHOD in environment", doRequest(w, r); want != have {
+		t.Logf("network=%#v, address=%#v", p.Network(), p.Address())
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
 
@@ -254,5 +251,4 @@ func TestClient_StdErr(t *testing.T) {
 	if want, have := "", w.Body.String(); want != have {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
-
 }
