@@ -68,7 +68,7 @@ func TestPoolClient_Close(t *testing.T) {
 	ch := make(chan *PoolClient)
 	defer close(ch)
 	pc := &PoolClient{
-		Client:       &client{},
+		Client:       &client{ids: NewStaticIdPool()},
 		expires:      time.Now().Add(-time.Millisecond),
 		returnClient: ch,
 	}

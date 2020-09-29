@@ -63,55 +63,11 @@ type Request struct {
 	KeepConn bool
 }
 
-type idPool struct {
-	IDs chan uint16
-}
-
-// AllocID implements Client.AllocID
-func (p *idPool) Alloc() uint16 {
-	return <-p.IDs
-}
-
-// ReleaseID implements Client.ReleaseID
-func (p *idPool) Release(id uint16) {
-	go func() {
-		// release the ID back to channel for reuse
-		// use goroutine to prev0, ent blocking ReleaseID
-		p.IDs <- id
-	}()
-}
-
-func newIDs(limit uint32) (p idPool) {
-
-	// sanatize limit
-	if limit == 0 || limit > 65536 {
-		limit = 65536
-	}
-
-	// pool requestID for the client
-	//
-	// requestID: Identifies the FastCGI request to which the record belongs.
-	// The Web server re-uses FastCGI request IDs; the application
-	// keeps track of the current state of each request ID on a given
-	// transport connection.
-	//
-	// Ref: https://fast-cgi.github.io/spec#33-records
-	ids := make(chan uint16)
-	go func(maxID uint16) {
-		for i := uint16(0); i < maxID; i++ {
-			ids <- i
-		}
-		ids <- uint16(maxID)
-	}(uint16(limit - 1))
-
-	p.IDs = ids
-	return
-}
 
 // client is the default implementation of Client
 type client struct {
 	conn *conn
-	ids  idPool
+	ids  IdPool
 }
 
 // writeRequest writes params and stdin to the FastCGI application
@@ -341,13 +297,20 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 // Close implements Client.Close
 // If the inner connection has been closed before,
 // this method would do nothing and return nil
-func (c *client) Close() (err error) {
-	if c.conn == nil {
-		return
+func (c *client) Close() error {
+	err := c.ids.Close()
+	if err != nil {
+		return err
 	}
+
+	if c.conn == nil {
+		return nil
+	}
+
 	err = c.conn.Close()
 	c.conn = nil
-	return
+
+	return err
 }
 
 // Client is a client interface of FastCGI
@@ -383,14 +346,21 @@ func SimpleConnFactory(network, address string) ConnFactory {
 type ClientFactory func() (Client, error)
 
 // SimpleClientFactory returns a ClientFactory implementation
-// with the given ConnFactory.
+// with the given ConnFactor and a Dynamic ID Pool.
 //
 // limit is the maximum number of request that the
-// applcation support. 0 means the maximum number
+// application support. 0 means the maximum number
 // available for 16bit request id (65536).
 // Default 0.
 //
 func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
+	return SimpleClientFactoryWithIdPool(connFactory, NewDynamicIdPool(limit))
+}
+
+// SimpleClientFactoryWithIdPool returns a ClientFactory implementation
+// with the given ConnFactor and IdPool.
+//
+func SimpleClientFactoryWithIdPool(connFactory ConnFactory, idPool IdPool) ClientFactory {
 	return func() (c Client, err error) {
 		// connect to given network address
 		conn, err := connFactory()
@@ -401,7 +371,7 @@ func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
 		// create client
 		c = &client{
 			conn: newConn(conn),
-			ids:  newIDs(limit),
+			ids:  idPool,
 		}
 		return
 	}
