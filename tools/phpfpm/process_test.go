@@ -99,7 +99,10 @@ func TestProcess_StartStop(t *testing.T) {
 	process := phpfpm.NewProcess(path)
 	process.SetDatadir(basepath + "/var")
 	process.User = username
-	process.SaveConfig(basepath + "/etc/test.startstop.conf")
+	if err := process.SaveConfig(basepath + "/etc/test.startstop.conf"); err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
 
 	if err := process.Start(); err != nil {
 		t.Errorf("unexpected error: %s", err.Error())

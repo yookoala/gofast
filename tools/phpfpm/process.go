@@ -60,25 +60,51 @@ func NewProcess(phpFpm string) *Process {
 
 // SaveConfig generates config file according to the
 // process attributes
-func (proc *Process) SaveConfig(path string) {
+func (proc *Process) SaveConfig(path string) (err error) {
 	proc.ConfigFile = path
-	proc.Config().SaveTo(proc.ConfigFile)
+	c, err := proc.Config()
+	if err != nil {
+		return
+	}
+	err = c.SaveTo(proc.ConfigFile)
+	return
 }
 
 // Config generates an minimalistic config ini file
 // in *ini.File format. You may then use SaveTo(path)
 // to save it
-func (proc *Process) Config() (f *ini.File) {
+func (proc *Process) Config() (f *ini.File, err error) {
+	var s *ini.Section
 	f = ini.Empty()
-	f.NewSection("global")
-	f.Section("global").NewKey("pid", proc.PidFile)
-	f.Section("global").NewKey("error_log", proc.ErrorLog)
-	f.NewSection("www")
-	f.Section("www").NewKey("listen", proc.Listen)
-	f.Section("www").NewKey("pm", "static")
-	f.Section("www").NewKey("pm.max_children", fmt.Sprintf("%d", proc.Worker))
+
+	// global
+	if s, err = f.NewSection("global"); err != nil {
+		return
+	}
+	if _, err = s.NewKey("pid", proc.PidFile); err != nil {
+		return
+	}
+	if _, err = s.NewKey("error_log", proc.ErrorLog); err != nil {
+		return
+	}
+
+	// www
+	if s, err = f.NewSection("www"); err != nil {
+		return
+	}
+	if _, err = s.NewKey("listen", proc.Listen); err != nil {
+		return
+	}
+	if _, err = s.NewKey("pm", "static"); err != nil {
+		return
+	}
+	if _, err = s.NewKey("pm.max_children", fmt.Sprintf("%d", proc.Worker)); err != nil {
+		return
+	}
 	if proc.User != "" {
-		f.Section("www").NewKey("user", proc.User)
+		if _, err = s.NewKey("user", proc.User); err != nil {
+			return
+		}
 	}
 	return
 }
