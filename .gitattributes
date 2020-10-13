@@ -1,0 +1,2 @@
+# Force all text file to use Unix EOL
+* text=auto eol=lf
