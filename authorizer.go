@@ -99,7 +99,12 @@ func (ar Authorizer) Wrap(inner http.Handler) http.Handler {
 
 		ew := new(bytes.Buffer)
 		rw := httptest.NewRecorder() // FIXME: should do this without httptest
-		resp.WriteTo(rw, ew)
+		if err = resp.WriteTo(rw, ew); err != nil {
+			log.Printf("cannot write to response pipe: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, http.StatusText(http.StatusInternalServerError))
+			return
+		}
 
 		// if code is not http.StatusOK (200)
 		if rw.Code != http.StatusOK {
@@ -110,7 +115,7 @@ func (ar Authorizer) Wrap(inner http.Handler) http.Handler {
 				}
 			}
 			w.WriteHeader(rw.Code)
-			fmt.Fprintf(w, rw.Body.String())
+			fmt.Fprint(w, rw.Body.String())
 
 			// if error stream is not empty
 			// also write to response
@@ -129,7 +134,7 @@ func (ar Authorizer) Wrap(inner http.Handler) http.Handler {
 		// no problem from authorizer
 		// pass down variable to the inner handler
 		// and discard the authorizer stdout and stderr
-		for k, m := range rw.HeaderMap {
+		for k, m := range rw.Header() {
 			// looking for header with keys "Variable-*"
 			// strip the prefix and pass to the inner header
 			if len(k) > 9 && strings.HasPrefix(strings.ToLower(k), "variable-") {

@@ -99,7 +99,10 @@ func TestProcess_StartStop(t *testing.T) {
 	process := phpfpm.NewProcess(path)
 	process.SetDatadir(basepath + "/var")
 	process.User = username
-	process.SaveConfig(basepath + "/etc/test.startstop.conf")
+	if err := process.SaveConfig(basepath + "/etc/test.startstop.conf"); err != nil {
+		t.Errorf("unexpected error: %s", err.Error())
+		return
+	}
 
 	if err := process.Start(); err != nil {
 		t.Errorf("unexpected error: %s", err.Error())
@@ -132,17 +135,23 @@ func ExampleProcess() {
 	process.User = username
 
 	// save the config file to basepath + "/etc/php-fpm.conf"
-	process.SaveConfig(basepath + "/etc/example.conf")
-	process.Start()
+	if err := process.SaveConfig(basepath + "/etc/example.conf"); err != nil {
+		panic(err)
+	}
+	if err := process.Start(); err != nil {
+		panic(err)
+	}
 
 	go func() {
 		// do something that needs phpfpm
 		// ...
 		time.Sleep(time.Millisecond * 50)
-		process.Stop()
+		_ = process.Stop()
 	}()
 
-	process.Wait()
+	if err := process.Wait(); err != nil {
+		panic(err)
+	}
 
 	// Output:
 }

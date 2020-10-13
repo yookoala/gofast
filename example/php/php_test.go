@@ -31,6 +31,12 @@ func init() {
 	username = os.Getenv("USER")
 }
 
+func checkError(t *testing.T, cb func() error) {
+	if err := cb(); err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+}
+
 func isExamplePath(testPath string) bool {
 	if _, err := os.Stat(testPath); os.IsNotExist(err) {
 		return false
@@ -81,8 +87,7 @@ func get(h http.Handler, path string) (w *httptest.ResponseRecorder, err error) 
 }
 
 func post(h http.Handler, path string, payload string) (w *httptest.ResponseRecorder, err error) {
-	var reader io.Reader
-	reader = strings.NewReader(payload)
+	var reader io.Reader = strings.NewReader(payload)
 	r, err := http.NewRequest("POST", path, reader)
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	r.Header.Add("Content-Length", fmt.Sprintf("%d", len(payload)))
@@ -123,7 +128,7 @@ func initEnv(t *testing.T, name string, worker int) (exmpPath string, process *p
 func TestNewSimpleHandler(t *testing.T) {
 
 	exmpPath, process := initEnv(t, "phpfpm1", 10)
-	defer process.Stop()
+	defer checkError(t, process.Stop)
 
 	// start the proxy handler
 	network, address := process.Address()
@@ -190,7 +195,7 @@ func TestNewSimpleHandler(t *testing.T) {
 func TestNewSimpleHandler__ErrorStream(t *testing.T) {
 
 	exmpPath, process := initEnv(t, "phpfpm2", 1) // 1 worker to test regression
-	defer process.Stop()
+	defer checkError(t, process.Stop)
 
 	// start the proxy handler
 	network, address := process.Address()
@@ -222,7 +227,7 @@ func TestNewSimpleHandler__ErrorStream(t *testing.T) {
 func TestNewFileEndpointHandler(t *testing.T) {
 
 	exmpPath, process := initEnv(t, "phpfpm3", 10)
-	defer process.Stop()
+	defer checkError(t, process.Stop)
 
 	// start the proxy handler
 	var w *httptest.ResponseRecorder
