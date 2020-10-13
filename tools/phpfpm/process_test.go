@@ -135,17 +135,23 @@ func ExampleProcess() {
 	process.User = username
 
 	// save the config file to basepath + "/etc/php-fpm.conf"
-	process.SaveConfig(basepath + "/etc/example.conf")
-	process.Start()
+	if err := process.SaveConfig(basepath + "/etc/example.conf"); err != nil {
+		panic(err)
+	}
+	if err := process.Start(); err != nil {
+		panic(err)
+	}
 
 	go func() {
 		// do something that needs phpfpm
 		// ...
 		time.Sleep(time.Millisecond * 50)
-		process.Stop()
+		_ = process.Stop()
 	}()
 
-	process.Wait()
+	if err := process.Wait(); err != nil {
+		panic(err)
+	}
 
 	// Output:
 }
