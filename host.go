@@ -70,7 +70,9 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	errBuffer := new(bytes.Buffer)
-	resp.WriteTo(w, errBuffer)
+	if err = resp.WriteTo(w, errBuffer); err != nil {
+		log.Printf("gofast: error writing error buffer to response: %s", err)
+	}
 
 	if errBuffer.Len() > 0 {
 		log.Printf("gofast: error stream from application process %s",
