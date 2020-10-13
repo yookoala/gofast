@@ -160,19 +160,10 @@ func MapRemoteHost(inner SessionHandler) SessionHandler {
 //  SCRIPT_NAME
 func FilterAuthReqParams(inner SessionHandler) SessionHandler {
 	return func(client Client, req *Request) (*ResponsePipe, error) {
-		if _, ok := req.Params["CONTENT_LENGTH"]; ok {
-			delete(req.Params, "CONTENT_LENGTH")
-		}
-		if _, ok := req.Params["PATH_INFO"]; ok {
-			delete(req.Params, "PATH_INFO")
-		}
-		if _, ok := req.Params["PATH_TRANSLATED"]; ok {
-			delete(req.Params, "PATH_TRANSLATED")
-		}
-		if _, ok := req.Params["SCRIPT_NAME"]; ok {
-			delete(req.Params, "SCRIPT_NAME")
-		}
-
+		delete(req.Params, "CONTENT_LENGTH")
+		delete(req.Params, "PATH_INFO")
+		delete(req.Params, "PATH_TRANSLATED")
+		delete(req.Params, "SCRIPT_NAME")
 		return inner(client, req)
 	}
 }
