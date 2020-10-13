@@ -134,7 +134,7 @@ func (ar Authorizer) Wrap(inner http.Handler) http.Handler {
 		// no problem from authorizer
 		// pass down variable to the inner handler
 		// and discard the authorizer stdout and stderr
-		for k, m := range rw.HeaderMap {
+		for k, m := range rw.Header() {
 			// looking for header with keys "Variable-*"
 			// strip the prefix and pass to the inner header
 			if len(k) > 9 && strings.HasPrefix(strings.ToLower(k), "variable-") {
