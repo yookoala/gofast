@@ -102,7 +102,7 @@ func (ar Authorizer) Wrap(inner http.Handler) http.Handler {
 		if err = resp.WriteTo(rw, ew); err != nil {
 			log.Printf("cannot write to response pipe: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, http.StatusText(http.StatusInternalServerError))
+			fmt.Fprint(w, http.StatusText(http.StatusInternalServerError))
 			return
 		}
 
@@ -115,7 +115,7 @@ func (ar Authorizer) Wrap(inner http.Handler) http.Handler {
 				}
 			}
 			w.WriteHeader(rw.Code)
-			fmt.Fprintf(w, rw.Body.String())
+			fmt.Fprint(w, rw.Body.String())
 
 			// if error stream is not empty
 			// also write to response
