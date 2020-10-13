@@ -99,7 +99,12 @@ func (ar Authorizer) Wrap(inner http.Handler) http.Handler {
 
 		ew := new(bytes.Buffer)
 		rw := httptest.NewRecorder() // FIXME: should do this without httptest
-		resp.WriteTo(rw, ew)
+		if err = resp.WriteTo(rw, ew); err != nil {
+			log.Printf("cannot write to response pipe: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, http.StatusText(http.StatusInternalServerError))
+			return
+		}
 
 		// if code is not http.StatusOK (200)
 		if rw.Code != http.StatusOK {
