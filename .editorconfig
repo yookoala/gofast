@@ -1,0 +1,20 @@
+# top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file
+# with UTF-8 encoding by default.
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+
+[*.go]
+indent_style = tab
+
+[*.{js,json}]
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_style = space
+indent_size = 4

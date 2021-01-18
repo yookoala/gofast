@@ -1,4 +1,4 @@
-# gofast [![GoDoc][godoc-badge]][godoc] [![Go Report Card][goreport-badge]][goreport] [![Travis CI results][travis-badge]][travis]
+# gofast [![GoDoc][godoc-badge]][godoc] [![Go Report Card][goreport-badge]][goreport] [![Travis CI results][travis-badge]][travis] [![GitHub Action Test result][github-action-badge]][github-action]
 
 **gofast** is a [FastCGI][fastcgi] "client" library written purely in
 [golang][golang].
@@ -25,6 +25,8 @@
 [godoc-badge]: https://godoc.org/github.com/yookoala/gofast?status.svg
 [travis]: https://travis-ci.org/yookoala/gofast?branch=master
 [travis-badge]: https://api.travis-ci.org/yookoala/gofast.svg?branch=master
+[github-action]: https://github.com/yookoala/gofast/actions?query=workflow%3ATests+branch%3Amaster
+[github-action-badge]: https://github.com/yookoala/gofast/workflows/Tests/badge.svg?branch=master
 [goreport]: https://goreportcard.com/report/github.com/yookoala/gofast
 [goreport-badge]: https://goreportcard.com/badge/github.com/yookoala/gofast
 [golang]: https://golang.org
