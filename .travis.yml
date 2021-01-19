@@ -26,6 +26,10 @@ env:
   - TEST_PHPFPM_PATH=/usr/sbin/php-fpm7.4
   - GO111MODULE=on
 
+if:
+  (type = pull_request AND head_repo != repo) OR
+  (type = push)
+
 before_script:
   # for python3 tests
   - python3 -m venv myvenv
