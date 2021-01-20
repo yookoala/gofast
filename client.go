@@ -353,7 +353,7 @@ type ClientFactory func() (Client, error)
 // available for 16bit request id (65536).
 // Default 0.
 //
-func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
+func SimpleClientFactory(connFactory ConnFactory, limit uint16) ClientFactory {
 	return SimpleClientFactoryWithIdPool(connFactory, NewDynamicIdPool(limit))
 }
 

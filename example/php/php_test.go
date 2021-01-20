@@ -125,8 +125,8 @@ func initEnv(t *testing.T, name string, worker int) (exmpPath string, process *p
 
 	return
 }
-func TestNewSimpleHandler(t *testing.T) {
 
+func TestNewSimpleHandler(t *testing.T) {
 	exmpPath, process := initEnv(t, "phpfpm1", 10)
 	defer checkError(t, process.Stop)
 

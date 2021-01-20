@@ -1,5 +1,9 @@
 package gofast
 
+import (
+	"sync"
+)
+
 // IdPool handles allocation and releasing of ids
 type IdPool interface {
 	// Alloc allocates a new id from the pool
@@ -38,13 +42,30 @@ func (p *staticIdPool) Close() error {
 
 type dynamicIdPool struct {
 	IDs chan uint16
+	done chan bool
+	wg sync.WaitGroup
 }
 
-func NewDynamicIdPool(limit uint32) IdPool {
+func NewDynamicIdPool(limit uint16) IdPool {
 	// Sanitize limit
-	if limit == 0 || limit > 65536 {
-		limit = 65536
+	if limit == 0 {
+		limit = 65535
 	}
+
+	pool := &dynamicIdPool{
+		IDs: make(chan uint16),
+		done: make(chan bool),
+	}
+
+	go pool.sequencer(limit)
+
+	return pool
+}
+
+func (p *dynamicIdPool) sequencer(limit uint16) {
+	p.wg.Add(1)
+
+	defer p.wg.Done()
 
 	// pool requestID for the client
 	//
@@ -54,20 +75,13 @@ func NewDynamicIdPool(limit uint32) IdPool {
 	// transport connection.
 	//
 	// Ref: https://fast-cgi.github.io/spec#33-records
-	ids := make(chan uint16)
-	go func(maxID uint16) {
-		// Recover when IDs channel is closed
-		defer func() {
-			recover()
-		}()
-
-		for i := uint16(0); i < maxID; i++ {
-			ids <- i
+	for i := uint16(0); i < limit; i++ {
+		select {
+			case <-p.done:
+				return
+			case p.IDs <- i:
 		}
-		ids <- uint16(maxID)
-	}(uint16(limit - 1))
-
-	return &dynamicIdPool{IDs: ids}
+	}
 }
 
 // Alloc implements IdPool.Alloc
@@ -83,18 +97,24 @@ func (p *dynamicIdPool) Release(id uint16) {
 			recover()
 		}()
 
-		// release the ID back to channel for reuse
-		// use goroutine to prev0, ent blocking ReleaseID
-		p.IDs <- id
+		p.wg.Add(1)
+
+		defer p.wg.Done()
+
+		select {
+		case <-p.done:
+		case p.IDs <- id:
+		}
 	}()
 }
 
 // Close implements IdPool.Close
 func (p *dynamicIdPool) Close() error {
-	if p.IDs != nil {
-		close(p.IDs)
-		p.IDs = nil
-	}
+	close(p.done)
+
+	p.wg.Wait()
+
+	close(p.IDs)
 
 	return nil
 }
