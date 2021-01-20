@@ -1,11 +1,12 @@
 <?php
 
+$submitted = false;
 if (!empty($_POST)) {
   $method = "POST";
-  $submitted = !empty($_POST) ? var_export($_POST, TRUE) : FALSE;
+  $submitted = var_export($_POST, TRUE);
 } else if (!empty($_GET)) {
   $method = "GET";
-  $submitted = !empty($_GET) ? var_export($_GET, TRUE) : FALSE;
+  $submitted = var_export($_GET, TRUE);
 }
 
 $entityBody = file_get_contents('php://input');
