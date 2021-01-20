@@ -132,9 +132,7 @@ func TestNewSimpleHandler(t *testing.T) {
 
 	// start the proxy handler
 	network, address := process.Address()
-	h := php.NewSimpleHandler(
-		path.Join(exmpPath, "htdocs"),
-		network, address)
+	h := php.NewSimpleHandler(path.Join(exmpPath, "htdocs"), network, address)
 
 	// check results
 	w, err := get(h, "/")
@@ -152,6 +150,7 @@ func TestNewSimpleHandler(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
 
+	h = php.NewSimpleHandler(path.Join(exmpPath, "htdocs"), network, address)
 	w, err = get(h, "/index.php")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
@@ -161,6 +160,7 @@ func TestNewSimpleHandler(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", want, have)
 	}
 
+	h = php.NewSimpleHandler(path.Join(exmpPath, "htdocs"), network, address)
 	w, err = get(h, "/form.php")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
@@ -171,6 +171,7 @@ func TestNewSimpleHandler(t *testing.T) {
 		t.Errorf("expected to start with %#v, got %#v", formPrefix, have)
 	}
 
+	h = php.NewSimpleHandler(path.Join(exmpPath, "htdocs"), network, address)
 	w, err = get(h, "/form.php?hello=world")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
@@ -182,6 +183,8 @@ func TestNewSimpleHandler(t *testing.T) {
 
 	form := url.Values{}
 	form.Add("text_input", "hello world")
+
+	h = php.NewSimpleHandler(path.Join(exmpPath, "htdocs"), network, address)
 	w, err = post(h, "/form.php", form.Encode())
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
@@ -199,9 +202,7 @@ func TestNewSimpleHandler__ErrorStream(t *testing.T) {
 
 	// start the proxy handler
 	network, address := process.Address()
-	h := php.NewSimpleHandler(
-		path.Join(exmpPath, "htdocs"),
-		network, address)
+	h := php.NewSimpleHandler(path.Join(exmpPath, "htdocs"), network, address)
 
 	// check results
 	w, err := get(h, "/error.php")
@@ -214,6 +215,7 @@ func TestNewSimpleHandler__ErrorStream(t *testing.T) {
 	}
 
 	// check results
+	h = php.NewSimpleHandler(path.Join(exmpPath, "htdocs"), network, address)
 	w, err = get(h, "/error.php?error_only=1")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
@@ -234,9 +236,7 @@ func TestNewFileEndpointHandler(t *testing.T) {
 	var err error
 	var resp lzjson.Node
 	network, address := process.Address()
-	h := php.NewFileEndpointHandler(
-		path.Join(exmpPath, "htdocs", "vars.php"),
-		network, address)
+	h := php.NewFileEndpointHandler(path.Join(exmpPath, "htdocs", "vars.php"), network, address)
 
 	// check results for a proper path
 	w, err = get(h, "/")
@@ -256,6 +256,7 @@ func TestNewFileEndpointHandler(t *testing.T) {
 	}
 
 	// check results for a proper path
+	h = php.NewFileEndpointHandler(path.Join(exmpPath, "htdocs", "vars.php"), network, address)
 	w, err = get(h, "/hello/world")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
@@ -273,6 +274,7 @@ func TestNewFileEndpointHandler(t *testing.T) {
 	}
 
 	// check results for a proper path
+	h = php.NewFileEndpointHandler(path.Join(exmpPath, "htdocs", "vars.php"), network, address)
 	w, err = get(h, "/index.php")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)

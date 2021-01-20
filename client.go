@@ -298,11 +298,16 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 // If the inner connection has been closed before,
 // this method would do nothing and return nil
 func (c *client) Close() error {
+	err := c.ids.Close()
+	if err != nil {
+		return err
+	}
+
 	if c.conn == nil {
 		return nil
 	}
 
-	err := c.conn.Close()
+	err = c.conn.Close()
 	c.conn = nil
 
 	return err
