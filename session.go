@@ -213,6 +213,11 @@ func (fs *FileSystemRouter) Router() Middleware {
 				fastcgiScriptName, fastcgiPathInfo = matches[1], matches[2]
 			}
 
+			// If accessing a directory, try accessing document index file
+			if strings.HasSuffix(fastcgiScriptName, "/") {
+				fastcgiScriptName = path.Join(fastcgiScriptName, "index.php")
+			}
+
 			req.Params["PATH_INFO"] = fastcgiPathInfo
 			req.Params["PATH_TRANSLATED"] = filepath.Join(docroot, fastcgiPathInfo)
 			req.Params["SCRIPT_NAME"] = fastcgiScriptName
@@ -228,11 +233,6 @@ func (fs *FileSystemRouter) Router() Middleware {
 			}
 
 			// handle directory index
-			urlPath := r.URL.Path
-			if strings.HasSuffix(urlPath, "/") {
-				urlPath = path.Join(urlPath, "index.php")
-			}
-			req.Params["SCRIPT_FILENAME"] = path.Join(fs.DocRoot, urlPath)
 
 			return inner(client, req)
 		}
