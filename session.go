@@ -198,6 +198,7 @@ type FileSystemRouter struct {
 //  DOCUMENT_ROOT
 //
 func (fs *FileSystemRouter) Router() Middleware {
+	pathinfoRe := regexp.MustCompile(`^(.+\.php)(/?.+)$`)
 	return func(inner SessionHandler) SessionHandler {
 		return func(client Client, req *Request) (*ResponsePipe, error) {
 
@@ -207,8 +208,7 @@ func (fs *FileSystemRouter) Router() Middleware {
 			fastcgiScriptName := r.URL.Path
 
 			var fastcgiPathInfo string
-			pathinfoRe := regexp.MustCompile(`^(.+\.php)(/?.+)$`)
-			if matches := pathinfoRe.FindStringSubmatch(fastcgiScriptName); len(matches) > 0 {
+			if matches := pathinfoRe.Copy().FindStringSubmatch(fastcgiScriptName); len(matches) > 0 {
 				fastcgiScriptName, fastcgiPathInfo = matches[1], matches[2]
 			}
 
