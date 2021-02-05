@@ -179,3 +179,35 @@ func TestMapFilterRequest(t *testing.T) {
 		return
 	}
 }
+
+func TestFileSystemRouter(t *testing.T) {
+	fs := &gofast.FileSystemRouter{
+		DocRoot:  "/non-exists/folder/structure",
+		Exts:     []string{"php"},
+		DirIndex: []string{"index.php"},
+	}
+
+	h := gofast.Chain(
+		gofast.BasicParamsMap,
+		fs.Router(),
+	)(func(client gofast.Client, req *gofast.Request) (resp *gofast.ResponsePipe, err error) {
+		t.Logf("SCRIPT_FILENAME: %s", req.Params["SCRIPT_FILENAME"])
+		return
+	})
+
+	r, err := http.NewRequest("GET", "http://foobar.com/", nil)
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+	r.URL.Path = "/../../hello-escape"
+
+	_, err = h(nil, gofast.NewRequest(r))
+	if err == nil {
+		t.Errorf("expected error, got nil")
+		return
+	}
+
+	if want, have := "error: access path outside of filesystem docroot", err.Error(); want != have {
+		t.Errorf("expected \"%s\", got \"%s\"", want, have)
+	}
+}

@@ -199,6 +199,7 @@ type FileSystemRouter struct {
 //
 func (fs *FileSystemRouter) Router() Middleware {
 	pathinfoRe := regexp.MustCompile(`^(.+\.php)(/?.+)$`)
+	docroot := filepath.Join(fs.DocRoot) // converts to absolute path
 	return func(inner SessionHandler) SessionHandler {
 		return func(client Client, req *Request) (*ResponsePipe, error) {
 
@@ -213,11 +214,18 @@ func (fs *FileSystemRouter) Router() Middleware {
 			}
 
 			req.Params["PATH_INFO"] = fastcgiPathInfo
-			req.Params["PATH_TRANSLATED"] = filepath.Join(fs.DocRoot, fastcgiPathInfo)
+			req.Params["PATH_TRANSLATED"] = filepath.Join(docroot, fastcgiPathInfo)
 			req.Params["SCRIPT_NAME"] = fastcgiScriptName
-			req.Params["SCRIPT_FILENAME"] = filepath.Join(fs.DocRoot, fastcgiScriptName)
+			req.Params["SCRIPT_FILENAME"] = filepath.Join(docroot, fastcgiScriptName)
 			req.Params["DOCUMENT_URI"] = r.URL.Path
-			req.Params["DOCUMENT_ROOT"] = fs.DocRoot
+			req.Params["DOCUMENT_ROOT"] = docroot
+
+			// check if the script filename is within docroot.
+			// triggers error if not.
+			if !strings.HasPrefix(req.Params["SCRIPT_FILENAME"], docroot) {
+				err := fmt.Errorf("error: access path outside of filesystem docroot")
+				return nil, err
+			}
 
 			// handle directory index
 			urlPath := r.URL.Path
