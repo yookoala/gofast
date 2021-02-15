@@ -31,6 +31,8 @@ const (
 	RoleResponder Role = iota + 1
 	RoleAuthorizer
 	RoleFilter
+
+	MaxUint = ^uint16(0)
 )
 
 // NewRequest returns a standard FastCGI request
@@ -64,54 +66,34 @@ type Request struct {
 }
 
 type idPool struct {
-	IDs chan uint16
+	IDs  uint16
+	Lock *sync.Mutex
 }
 
 // AllocID implements Client.AllocID
 func (p *idPool) Alloc() uint16 {
-	return <-p.IDs
+	p.Lock.Lock()
+	idx := p.IDs
+	if idx == MaxUint {
+		// reset
+		idx = 1
+		p.IDs = 1
+	}
+	p.IDs++
+	p.Lock.Unlock()
+
+	return idx
 }
 
 // ReleaseID implements Client.ReleaseID
 func (p *idPool) Release(id uint16) {
-	go func() {
-		// release the ID back to channel for reuse
-		// use goroutine to prev0, ent blocking ReleaseID
-		p.IDs <- id
-	}()
-}
-
-func newIDs(limit uint32) (p idPool) {
-
-	// sanatize limit
-	if limit == 0 || limit > 65536 {
-		limit = 65536
-	}
-
-	// pool requestID for the client
-	//
-	// requestID: Identifies the FastCGI request to which the record belongs.
-	// The Web server re-uses FastCGI request IDs; the application
-	// keeps track of the current state of each request ID on a given
-	// transport connection.
-	//
-	// Ref: https://fast-cgi.github.io/spec#33-records
-	ids := make(chan uint16)
-	go func(maxID uint16) {
-		for i := uint16(0); i < maxID; i++ {
-			ids <- i
-		}
-		ids <- uint16(maxID)
-	}(uint16(limit - 1))
-
-	p.IDs = ids
-	return
+	// noop
 }
 
 // client is the default implementation of Client
 type client struct {
 	conn *conn
-	ids  idPool
+	ids  *idPool
 }
 
 // writeRequest writes params and stdin to the FastCGI application
@@ -385,10 +367,7 @@ type ClientFactory func() (Client, error)
 // SimpleClientFactory returns a ClientFactory implementation
 // with the given ConnFactory.
 //
-// limit is the maximum number of request that the
-// applcation support. 0 means the maximum number
-// available for 16bit request id (65536).
-// Default 0.
+// limit is UNUSED.
 //
 func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
 	return func() (c Client, err error) {
@@ -398,10 +377,13 @@ func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
 			return
 		}
 
+		pool := &idPool{}
+		pool.Lock = new(sync.Mutex)
+
 		// create client
 		c = &client{
 			conn: newConn(conn),
-			ids:  newIDs(limit),
+			ids:  pool,
 		}
 		return
 	}
