@@ -56,7 +56,7 @@ func TestIdPool_block(t *testing.T) {
 
 	// wait some time to see if we can allocate id again
 	select {
-	case <-time.After(time.Millisecond * 10):
+	case <-time.After(time.Second * 1):
 		t.Logf("alloc before release timeout as expected")
 	case id := <-alloc:
 		t.Errorf("allocated id unexpectedly: %v", id)
@@ -70,7 +70,7 @@ func TestIdPool_block(t *testing.T) {
 
 	// wait some time to see if we can allocate id again
 	select {
-	case <-time.After(time.Millisecond * 10):
+	case <-time.After(time.Second * 1):
 		t.Errorf("alloc after release timeout unexpectedly")
 	case id := <-alloc:
 		if want, have := uint16(42), id; want != have {
