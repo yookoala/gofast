@@ -69,12 +69,12 @@ type idPool struct {
 }
 
 // AllocID implements Client.AllocID
-func (p *idPool) Alloc() (id uint16) {
+func (p idPool) Alloc() (id uint16) {
 	return <-p.IDs
 }
 
 // ReleaseID implements Client.ReleaseID
-func (p *idPool) Release(id uint16) {
+func (p idPool) Release(id uint16) {
 	go func() {
 		defer recoverSendOnClosedChannel()
 
@@ -84,8 +84,7 @@ func (p *idPool) Release(id uint16) {
 	}()
 }
 
-func (p *idPool) Close() {
-
+func (p idPool) Close() {
 	close(p.IDs)
 }
 
