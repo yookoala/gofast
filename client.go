@@ -84,8 +84,11 @@ func (p *idPool) Release(id uint16) {
 func newIDs(limit uint32) (p idPool) {
 
 	// sanatize limit
-	if limit == 0 || limit > 65536 {
-		limit = 65536
+	if limit == 0 || limit > 65535 {
+		// Note: limit is the size of the pool
+		// Since 0 cannot be requestId, the effective
+		// pool is from 1 to 65535, hence size is 65535.
+		limit = 65535
 	}
 
 	// pool requestID for the client
@@ -98,11 +101,11 @@ func newIDs(limit uint32) (p idPool) {
 	// Ref: https://fast-cgi.github.io/spec#33-records
 	ids := make(chan uint16)
 	go func(maxID uint16) {
-		for i := uint16(0); i < maxID; i++ {
+		for i := uint16(1); i < maxID; i++ {
 			ids <- i
 		}
 		ids <- uint16(maxID)
-	}(uint16(limit - 1))
+	}(uint16(limit))
 
 	p.IDs = ids
 	return
@@ -387,7 +390,9 @@ type ClientFactory func() (Client, error)
 //
 // limit is the maximum number of request that the
 // applcation support. 0 means the maximum number
-// available for 16bit request id (65536).
+// available for 16bit request id (because 0 is not
+// a valid reqeust id, 65535).
+//
 // Default 0.
 //
 func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
