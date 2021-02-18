@@ -18,6 +18,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -66,9 +67,9 @@ type Request struct {
 }
 
 type idPool struct {
-	IDs  uint16
-	Used map[uint16]struct{}
+	IDs uint16
 
+	Used *sync.Map
 	Lock *sync.Mutex
 }
 
@@ -84,11 +85,14 @@ next:
 	}
 	p.IDs++
 
-	if _, inuse := p.Used[idx]; inuse {
+	if _, inuse := p.Used.Load(idx); inuse {
+		// Allow other go-routine to take priority
+		// to prevent spinlock here
+		runtime.Gosched()
 		goto next
 	}
 
-	p.Used[idx] = struct{}{}
+	p.Used.Store(idx, struct{}{})
 	p.Lock.Unlock()
 
 	return idx
@@ -96,9 +100,7 @@ next:
 
 // ReleaseID implements Client.ReleaseID
 func (p *idPool) Release(id uint16) {
-	p.Lock.Lock()
-	delete(p.Used, id)
-	p.Lock.Unlock()
+	p.Used.Delete(id)
 }
 
 // client is the default implementation of Client
@@ -388,7 +390,7 @@ func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
 			return
 		}
 
-		pool := newClient()
+		pool := newIDs()
 
 		// create client
 		c = &client{
@@ -399,9 +401,9 @@ func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
 	}
 }
 
-func newClient() *idPool {
+func newIDs() *idPool {
 	pool := &idPool{}
-	pool.Used = make(map[uint16]struct{})
+	pool.Used = new(sync.Map)
 	pool.Lock = new(sync.Mutex)
 	pool.IDs = uint16(1)
 
