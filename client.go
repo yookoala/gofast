@@ -388,9 +388,7 @@ func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
 			return
 		}
 
-		pool := &idPool{}
-		pool.Used = make(map[uint16]struct{})
-		pool.Lock = new(sync.Mutex)
+		pool := newClient()
 
 		// create client
 		c = &client{
@@ -399,6 +397,15 @@ func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
 		}
 		return
 	}
+}
+
+func newClient() *idPool {
+	pool := &idPool{}
+	pool.Used = make(map[uint16]struct{})
+	pool.Lock = new(sync.Mutex)
+	pool.IDs = uint16(1)
+
+	return pool
 }
 
 // NewResponsePipe returns an initialized new ResponsePipe struct
