@@ -67,12 +67,15 @@ type Request struct {
 
 type idPool struct {
 	IDs  uint16
+	Used map[uint16]struct{}
+
 	Lock *sync.Mutex
 }
 
 // AllocID implements Client.AllocID
 func (p *idPool) Alloc() uint16 {
 	p.Lock.Lock()
+next:
 	idx := p.IDs
 	if idx == MaxUint {
 		// reset
@@ -80,6 +83,12 @@ func (p *idPool) Alloc() uint16 {
 		p.IDs = 1
 	}
 	p.IDs++
+
+	if _, inuse := p.Used[idx]; inuse {
+		goto next
+	}
+
+	p.Used[idx] = struct{}{}
 	p.Lock.Unlock()
 
 	return idx
@@ -87,7 +96,9 @@ func (p *idPool) Alloc() uint16 {
 
 // ReleaseID implements Client.ReleaseID
 func (p *idPool) Release(id uint16) {
-	// noop
+	p.Lock.Lock()
+	delete(p.Used, id)
+	p.Lock.Unlock()
 }
 
 // client is the default implementation of Client
@@ -378,6 +389,7 @@ func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
 		}
 
 		pool := &idPool{}
+		pool.Used = make(map[uint16]struct{})
 		pool.Lock = new(sync.Mutex)
 
 		// create client
