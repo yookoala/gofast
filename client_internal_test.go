@@ -9,7 +9,7 @@ import (
 func TestIDPool_Alloc(t *testing.T) {
 	t.Logf("default limit: %d", 65535)
 	ids := newIDs(0)
-	for i := uint32(0); i <= 65535; i++ {
+	for i := uint32(1); i <= 65535; i++ {
 		if want, have := uint16(i), ids.Alloc(); want != have {
 			t.Errorf("expected %d, got %d", want, have)
 		}
@@ -51,7 +51,7 @@ func TestIDPool_Alloc_withLimit(t *testing.T) {
 	t.Logf("random limit: %d", limit)
 
 	ids := newIDs(limit)
-	for i := uint32(0); i < limit; i++ {
+	for i := uint32(1); i <= limit; i++ {
 		if want, have := uint16(i), ids.Alloc(); want != have {
 			t.Errorf("expected %d, got %d", want, have)
 		}
