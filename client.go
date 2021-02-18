@@ -18,6 +18,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -68,17 +69,24 @@ type idPool struct {
 }
 
 // AllocID implements Client.AllocID
-func (p *idPool) Alloc() uint16 {
+func (p *idPool) Alloc() (id uint16) {
 	return <-p.IDs
 }
 
 // ReleaseID implements Client.ReleaseID
 func (p *idPool) Release(id uint16) {
 	go func() {
+		defer recoverSendOnClosedChannel()
+
 		// release the ID back to channel for reuse
 		// use goroutine to prev0, ent blocking ReleaseID
 		p.IDs <- id
 	}()
+}
+
+func (p *idPool) Close() {
+
+	close(p.IDs)
 }
 
 func newIDs(limit uint32) (p idPool) {
@@ -342,14 +350,19 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 }
 
 // Close implements Client.Close
+//
 // If the inner connection has been closed before,
-// this method would do nothing and return nil
+// this method would do nothing and return nil.
+//
+// This will also close the IDPool.
 func (c *client) Close() (err error) {
+	// Close inner connection.
 	if c.conn == nil {
 		return
 	}
 	err = c.conn.Close()
 	c.conn = nil
+	c.ids.Close() // close the
 	return
 }
 
@@ -584,4 +597,18 @@ func (c ClientFunc) Do(req *Request) (resp *ResponsePipe, err error) {
 // Close implements Client.Close
 func (c ClientFunc) Close() error {
 	return nil
+}
+
+func recoverSendOnClosedChannel() {
+	if r := recover(); r != nil {
+		switch v := r.(type) {
+		case runtime.Error:
+			if v.Error() == "send on closed channel" {
+				// ignore
+				return
+			}
+		default:
+			panic(r)
+		}
+	}
 }
