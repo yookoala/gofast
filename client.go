@@ -103,6 +103,15 @@ func (p *idPool) Release(id uint16) {
 	p.Used.Delete(id)
 }
 
+func newIDs() *idPool {
+	pool := &idPool{}
+	pool.Used = new(sync.Map)
+	pool.Lock = new(sync.Mutex)
+	pool.IDs = uint16(1)
+
+	return pool
+}
+
 // client is the default implementation of Client
 type client struct {
 	conn *conn
@@ -399,15 +408,6 @@ func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
 		}
 		return
 	}
-}
-
-func newIDs() *idPool {
-	pool := &idPool{}
-	pool.Used = new(sync.Map)
-	pool.Lock = new(sync.Mutex)
-	pool.IDs = uint16(1)
-
-	return pool
 }
 
 // NewResponsePipe returns an initialized new ResponsePipe struct
