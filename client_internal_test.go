@@ -36,7 +36,7 @@ func TestIdPool(t *testing.T) {
 	}
 }
 
-// If all IDs are used up, pool is supposed to block on alloc.
+// If all IDs are used up, pool is supposed to block on alloc after exhaustion.
 func TestIdPool_block(t *testing.T) {
 	pool := newIDs()
 
@@ -50,6 +50,15 @@ func TestIdPool_block(t *testing.T) {
 	}
 
 	alloc := make(chan uint16)
+	go func() {
+		alloc <- pool.Alloc()
+	}()
+	go func() {
+		alloc <- pool.Alloc()
+	}()
+	go func() {
+		alloc <- pool.Alloc()
+	}()
 	go func() {
 		alloc <- pool.Alloc()
 	}()
