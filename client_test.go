@@ -109,7 +109,6 @@ func testHandlerForCancel(t *testing.T, p *appServer, w http.ResponseWriter, r *
 
 	c, err := gofast.SimpleClientFactory(
 		gofast.SimpleConnFactory(p.Network(), p.Address()),
-		0,
 	)()
 	if err != nil {
 		http.Error(w, "failed to connect to FastCGI application", http.StatusBadGateway)
@@ -203,7 +202,6 @@ func TestClient_StdErr(t *testing.T) {
 	doRequest := func(w http.ResponseWriter, r *http.Request) (errStr string) {
 		c, err := gofast.SimpleClientFactory(
 			gofast.SimpleConnFactory(p.Network(), p.Address()),
-			0,
 		)()
 		if err != nil {
 			errStr = "web server: unable to connect to FastCGI application: " + err.Error()
