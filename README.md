@@ -104,7 +104,7 @@ func main() {
 	// route all requests to a single php file
 	http.Handle("/", gofast.NewHandler(
 		gofast.NewFileEndpoint("/var/www/html/index.php")(gofast.BasicSession),
-		gofast.SimpleClientFactory(connFactory, 0),
+		gofast.SimpleClientFactory(connFactory),
 	))
 
 	// serve at 8080 port
@@ -153,7 +153,7 @@ func main() {
 	// route all requests to relevant PHP file
 	http.Handle("/", gofast.NewHandler(
 		gofast.NewPHPFS("/var/www/html")(gofast.BasicSession),
-		gofast.SimpleClientFactory(connFactory, 0),
+		gofast.SimpleClientFactory(connFactory),
 	))
 
 	// serve at 8080 port
@@ -229,7 +229,7 @@ func main() {
 	// route all requests to a single php file
 	http.Handle("/", gofast.NewHandler(
 		gofast.NewFileEndpoint("/var/www/html/index.php")(sess),
-		gofast.SimpleClientFactory(connFactory, 0),
+		gofast.SimpleClientFactory(connFactory),
 	))
 
 	// serve at 8080 port
@@ -308,7 +308,7 @@ func myApp() http.Handler {
 func main() {
 	address := os.Getenv("FASTCGI_ADDR")
 	connFactory := gofast.SimpleConnFactory("tcp", address)
-	clientFactory := gofast.SimpleClientFactory(connFactory, 0)
+	clientFactory := gofast.SimpleClientFactory(connFactory)
 
 	// authorization with php
 	authSess := gofast.Chain(
@@ -361,7 +361,7 @@ import (
 func main() {
 	address := os.Getenv("FASTCGI_ADDR")
 	connFactory := gofast.SimpleConnFactory("tcp", address)
-	clientFactory := gofast.SimpleClientFactory(connFactory, 0)
+	clientFactory := gofast.SimpleClientFactory(connFactory)
 
 	// Note: The local file system "/var/www/html/" only need to be
 	// local to web server. No need for the FastCGI application to access
@@ -420,7 +420,7 @@ func main() {
 	// handle all scripts in document root
 	// extra pooling layer
 	pool := gofast.NewClientPool(
-		gofast.SimpleClientFactory(connFactory, 0),
+		gofast.SimpleClientFactory(connFactory),
 		10, // buffer size for pre-created client-connection
 		30*time.Second, // life span of a client before expire
 	)

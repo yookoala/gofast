@@ -20,7 +20,7 @@ import (
 func NewHandler(entrypoint, network, address string) http.Handler {
 	connFactory := gofast.SimpleConnFactory(network, address)
 	pool := gofast.NewClientPool(
-		gofast.SimpleClientFactory(connFactory, 0),
+		gofast.SimpleClientFactory(connFactory),
 		10,
 		60*time.Second,
 	)
@@ -59,7 +59,7 @@ func NewMuxHandler(
 	// common client pool for both filter and responder handler
 	connFactory := gofast.SimpleConnFactory(network, address)
 	pool := gofast.NewClientPool(
-		gofast.SimpleClientFactory(connFactory, 0),
+		gofast.SimpleClientFactory(connFactory),
 		10,
 		60*time.Second,
 	)

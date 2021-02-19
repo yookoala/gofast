@@ -20,7 +20,7 @@ import (
 func NewHandler(entrypoint, network, address string) http.Handler {
 	connFactory := gofast.SimpleConnFactory(network, address)
 	pool := gofast.NewClientPool(
-		gofast.SimpleClientFactory(connFactory, 0),
+		gofast.SimpleClientFactory(connFactory),
 		10,
 		60*time.Second,
 	)

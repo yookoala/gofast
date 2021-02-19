@@ -99,7 +99,7 @@ func TestClientPool_CreateClient_withErr(t *testing.T) {
 	cpHasError := NewClientPool(
 		SimpleClientFactory(func() (net.Conn, error) {
 			return nil, fmt.Errorf("dummy error")
-		}, 10),
+		}),
 		10, 1*time.Millisecond,
 	)
 	c, err := cpHasError.CreateClient()
@@ -117,7 +117,7 @@ func TestClientPool_CreateClient_withErr(t *testing.T) {
 	cpHasError = NewClientPool(
 		SimpleClientFactory(func() (net.Conn, error) {
 			return nil, fmt.Errorf("dummy error")
-		}, 0),
+		}),
 		0, 1*time.Millisecond,
 	)
 	c, err = cpHasError.CreateClient()
@@ -143,7 +143,7 @@ func TestClientPool_CreateClient_Return_0(t *testing.T) {
 			conn := mockConn(false)
 			atomic.AddUint64(&counter, 1)
 			return &conn, nil
-		}, 0),
+		}),
 		0, 1000*time.Millisecond,
 	)
 
@@ -195,7 +195,7 @@ func TestClientPool_CreateClient_Return_40(t *testing.T) {
 			conn := mockConn(false)
 			atomic.AddUint64(&counter, 1)
 			return &conn, nil
-		}, 0),
+		}),
 		40, 1000*time.Millisecond,
 	)
 

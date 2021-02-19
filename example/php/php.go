@@ -21,7 +21,7 @@ func NewSimpleHandler(docroot, network, address string) http.Handler {
 	connFactory := gofast.SimpleConnFactory(network, address)
 	h := gofast.NewHandler(
 		gofast.NewPHPFS(docroot)(gofast.BasicSession),
-		gofast.SimpleClientFactory(connFactory, 0),
+		gofast.SimpleClientFactory(connFactory),
 	)
 	return h
 }
@@ -41,7 +41,7 @@ func NewFileEndpointHandler(filepath, network, address string) http.Handler {
 	connFactory := gofast.SimpleConnFactory(network, address)
 	h := gofast.NewHandler(
 		gofast.NewFileEndpoint(filepath)(gofast.BasicSession),
-		gofast.SimpleClientFactory(connFactory, 0),
+		gofast.SimpleClientFactory(connFactory),
 	)
 	return h
 }

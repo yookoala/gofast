@@ -45,7 +45,6 @@ func TestHandler(t *testing.T) {
 				l.Addr().Network(),
 				l.Addr().String(),
 			),
-			0,
 		),
 	)
 	w := httptest.NewRecorder()

@@ -386,10 +386,7 @@ type ClientFactory func() (Client, error)
 
 // SimpleClientFactory returns a ClientFactory implementation
 // with the given ConnFactory.
-//
-// limit is UNUSED.
-//
-func SimpleClientFactory(connFactory ConnFactory, limit uint32) ClientFactory {
+func SimpleClientFactory(connFactory ConnFactory) ClientFactory {
 	return func() (c Client, err error) {
 		// connect to given network address
 		conn, err := connFactory()
