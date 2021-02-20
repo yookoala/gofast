@@ -198,15 +198,17 @@ func TestClient_StdErr(t *testing.T) {
 	})
 	defer p.Close()
 
+	// create reusable client factory
+	c, err := gofast.SimpleClientFactory(
+		gofast.SimpleConnFactory(p.Network(), p.Address()),
+	)()
+	if err != nil {
+		t.Fatalf("Unable for client factory to connect to server: %s", err.Error())
+	}
+	defer c.Close()
+
 	// Do the actual request
 	doRequest := func(w http.ResponseWriter, r *http.Request) (errStr string) {
-		c, err := gofast.SimpleClientFactory(
-			gofast.SimpleConnFactory(p.Network(), p.Address()),
-		)()
-		if err != nil {
-			errStr = "web server: unable to connect to FastCGI application: " + err.Error()
-			return
-		}
 		req := gofast.NewRequest(nil)
 
 		// Some required parameters with invalid values
