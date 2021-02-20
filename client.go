@@ -114,6 +114,9 @@ func newIDs() *idPool {
 type client struct {
 	conn *conn
 	ids  *idPool
+
+	// mutex for readResponse
+	respMutex sync.RWMutex
 }
 
 // writeRequest writes params and stdin to the FastCGI application
@@ -210,9 +213,20 @@ func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Requ
 	go func() {
 	readLoop:
 		for {
+
+			// Obtain lock for reading response
+			// make sure the connection is not closed
+			// in-between the reading process.
+			c.respMutex.RLock()
+			if c.conn == nil {
+				err = fmt.Errorf("client connect closed before response finish")
+				c.respMutex.RUnlock()
+				return
+			}
 			if err := rec.read(c.conn.rwc); err != nil {
 				break
 			}
+			c.respMutex.RUnlock()
 
 			// different output type for different stream
 			switch rec.h.Type {
@@ -344,11 +358,15 @@ func (c *client) Do(req *Request) (resp *ResponsePipe, err error) {
 // If the inner connection has been closed before,
 // this method would do nothing and return nil
 func (c *client) Close() (err error) {
+	// Make sure client is not reading response
+	// when closing the connection.
+	c.respMutex.Lock()
 	if c.conn == nil {
 		return
 	}
 	err = c.conn.Close()
 	c.conn = nil
+	c.respMutex.Unlock()
 	return
 }
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -250,5 +251,52 @@ func TestClient_StdErr(t *testing.T) {
 	// FIXME: should show "internal server error"
 	if want, have := "", w.Body.String(); want != have {
 		t.Errorf("expected %#v, got %#v", want, have)
+	}
+}
+
+func TestClient_close_before_readRequest(t *testing.T) {
+	// Test closing client before writeRequest
+	//
+	// Note: closing connection could cause client.conn nil
+	//       writing after close could cause error
+
+	// create a temp dummy fastcgi application server
+	p, err := newAppServer("client.test.sock", func(w http.ResponseWriter, r *http.Request) {
+		t.Logf("accessing FastCGI process")
+		fmt.Fprintf(w, "hello world")
+	})
+	if err != nil {
+		t.Fatalf("Unable to start server: %s", err.Error())
+	}
+	defer p.Close()
+
+	// create reusable client factory
+	c, err := gofast.SimpleClientFactory(
+		gofast.SimpleConnFactory(p.Network(), p.Address()),
+	)()
+	if err != nil {
+		t.Fatalf("Unable for client factory to connect to server: %s", err.Error())
+	}
+
+	// Mock creating a gofast.Request that still
+	// pending to write a body.
+	pr, pw := io.Pipe()
+	r, err := http.NewRequest("POST", "/add", pr)
+	r.Header.Add("Content-Length", "11")
+	if err != nil {
+		t.Errorf("unexpected error: %#v", err.Error())
+	}
+	writeBody := func() {
+		c.Close()
+		pw.Write([]byte("hello world"))
+	}
+	req := gofast.NewRequest(r)
+
+	// handle the result
+	go writeBody()
+	_, err = c.Do(req)
+	if err != nil {
+		t.Fatalf("web server: unable to connect to process request: %s", err.Error())
+		return
 	}
 }
