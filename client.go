@@ -207,10 +207,10 @@ func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Requ
 	done := make(chan int)
 
 	// readloop in goroutine
-	go func() {
+	go func(rwc io.ReadWriteCloser) {
 	readLoop:
 		for {
-			if err := rec.read(c.conn.rwc); err != nil {
+			if err := rec.read(rwc); err != nil {
 				break
 			}
 
@@ -228,7 +228,7 @@ func (c *client) readResponse(ctx context.Context, resp *ResponsePipe, req *Requ
 			}
 		}
 		close(done)
-	}()
+	}(c.conn.rwc)
 
 	select {
 	case <-ctx.Done():
