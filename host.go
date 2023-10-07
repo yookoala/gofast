@@ -71,7 +71,7 @@ func (h *defaultHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	errBuffer := new(bytes.Buffer)
 	if err = resp.WriteTo(w, errBuffer); err != nil {
-		log.Printf("gofast: error writing error buffer to response: %s", err)
+		log.Printf("gofast: problem writing error buffer to response - %s", err)
 	}
 
 	if errBuffer.Len() > 0 {
