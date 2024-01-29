@@ -120,7 +120,11 @@ func BasicParamsMap(inner SessionHandler) SessionHandler {
 
 		// the basic information here
 		req.Params["CONTENT_TYPE"] = r.Header.Get("Content-Type")
-		req.Params["CONTENT_LENGTH"] = r.Header.Get("Content-Length")
+		cl := r.Header.Get("Content-Length")
+		if cl == "" {
+			cl = strconv.FormatInt(r.ContentLength, 10)
+		}
+		req.Params["CONTENT_LENGTH"] = cl
 		req.Params["GATEWAY_INTERFACE"] = "CGI/1.1"
 		req.Params["REMOTE_ADDR"] = remoteAddr
 		req.Params["REMOTE_PORT"] = remotePort
