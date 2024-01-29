@@ -7,6 +7,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"golang.org/x/tools/godoc/vfs"
@@ -28,30 +29,29 @@ type SessionHandler func(client Client, req *Request) (resp *ResponsePipe, err e
 //
 // Ordinary fastcgi parameters on nginx (for PHP at least):
 //
-//  fastcgi_split_path_info ^(.+\.php)(/?.+)$;
-//  fastcgi_param  SCRIPT_FILENAME    $document_root$fastcgi_script_name;
-//  fastcgi_param  PATH_INFO          $fastcgi_path_info;
-//  fastcgi_param  PATH_TRANSLATED    $document_root$fastcgi_path_info;
-//  fastcgi_param  QUERY_STRING       $query_string;
-//  fastcgi_param  REQUEST_METHOD     $request_method;
-//  fastcgi_param  CONTENT_TYPE       $content_type;
-//  fastcgi_param  CONTENT_LENGTH     $content_length;
-//  fastcgi_param  SCRIPT_NAME        $fastcgi_script_name;
-//  fastcgi_param  REQUEST_URI        $request_uri;
-//  fastcgi_param  DOCUMENT_URI       $document_uri;
-//  fastcgi_param  DOCUMENT_ROOT      $document_root;
-//  fastcgi_param  SERVER_PROTOCOL    $server_protocol;
-//  fastcgi_param  HTTPS              $https if_not_empty;
-//  fastcgi_param  GATEWAY_INTERFACE  CGI/1.1;
-//  fastcgi_param  SERVER_SOFTWARE    nginx/$nginx_version;
-//  fastcgi_param  REMOTE_ADDR        $remote_addr;
-//  fastcgi_param  REMOTE_PORT        $remote_port;
-//  fastcgi_param  SERVER_ADDR        $server_addr;
-//  fastcgi_param  SERVER_PORT        $server_port;
-//  fastcgi_param  SERVER_NAME        $server_name;
-//  # PHP only, required if PHP was built with --enable-force-cgi-redirect
-//  fastcgi_param  REDIRECT_STATUS    200;
-//
+//	fastcgi_split_path_info ^(.+\.php)(/?.+)$;
+//	fastcgi_param  SCRIPT_FILENAME    $document_root$fastcgi_script_name;
+//	fastcgi_param  PATH_INFO          $fastcgi_path_info;
+//	fastcgi_param  PATH_TRANSLATED    $document_root$fastcgi_path_info;
+//	fastcgi_param  QUERY_STRING       $query_string;
+//	fastcgi_param  REQUEST_METHOD     $request_method;
+//	fastcgi_param  CONTENT_TYPE       $content_type;
+//	fastcgi_param  CONTENT_LENGTH     $content_length;
+//	fastcgi_param  SCRIPT_NAME        $fastcgi_script_name;
+//	fastcgi_param  REQUEST_URI        $request_uri;
+//	fastcgi_param  DOCUMENT_URI       $document_uri;
+//	fastcgi_param  DOCUMENT_ROOT      $document_root;
+//	fastcgi_param  SERVER_PROTOCOL    $server_protocol;
+//	fastcgi_param  HTTPS              $https if_not_empty;
+//	fastcgi_param  GATEWAY_INTERFACE  CGI/1.1;
+//	fastcgi_param  SERVER_SOFTWARE    nginx/$nginx_version;
+//	fastcgi_param  REMOTE_ADDR        $remote_addr;
+//	fastcgi_param  REMOTE_PORT        $remote_port;
+//	fastcgi_param  SERVER_ADDR        $server_addr;
+//	fastcgi_param  SERVER_PORT        $server_port;
+//	fastcgi_param  SERVER_NAME        $server_name;
+//	# PHP only, required if PHP was built with --enable-force-cgi-redirect
+//	fastcgi_param  REDIRECT_STATUS    200;
 type Middleware func(SessionHandler) SessionHandler
 
 // Chain chains middlewares into a single middleware.
@@ -81,22 +81,22 @@ func BasicSession(client Client, req *Request) (*ResponsePipe, error) {
 // req.Params.
 //
 // Parameters included:
-//  CONTENT_TYPE
-//  CONTENT_LENGTH
-//  HTTPS
-//  GATEWAY_INTERFACE
-//  REMOTE_ADDR
-//  REMOTE_PORT
-//  SERVER_PORT
-//  SERVER_NAME
-//  SERVER_PROTOCOL
-//  SERVER_SOFTWARE
-//  REDIRECT_STATUS
-//  REQUEST_METHOD
-//  REQUEST_SCHEME
-//  REQUEST_URI
-//  QUERY_STRING
 //
+//	CONTENT_TYPE
+//	CONTENT_LENGTH
+//	HTTPS
+//	GATEWAY_INTERFACE
+//	REMOTE_ADDR
+//	REMOTE_PORT
+//	SERVER_PORT
+//	SERVER_NAME
+//	SERVER_PROTOCOL
+//	SERVER_SOFTWARE
+//	REDIRECT_STATUS
+//	REQUEST_METHOD
+//	REQUEST_SCHEME
+//	REQUEST_URI
+//	QUERY_STRING
 func BasicParamsMap(inner SessionHandler) SessionHandler {
 	return func(client Client, req *Request) (*ResponsePipe, error) {
 
@@ -118,13 +118,19 @@ func BasicParamsMap(inner SessionHandler) SessionHandler {
 			}
 		}
 
+		cl := r.ContentLength
+		if cl < 1 {
+			cl, err = strconv.ParseInt(r.Header.Get("Content-Length"), 10, 64)
+			if err != nil {
+				cl = r.ContentLength
+			}
+		}
+		if cl >= 0 {
+			req.Params["CONTENT_LENGTH"] = strconv.FormatInt(cl, 10)
+		}
+
 		// the basic information here
 		req.Params["CONTENT_TYPE"] = r.Header.Get("Content-Type")
-		cl := r.Header.Get("Content-Length")
-		if cl == "" {
-			cl = strconv.FormatInt(r.ContentLength, 10)
-		}
-		req.Params["CONTENT_LENGTH"] = cl
 		req.Params["GATEWAY_INTERFACE"] = "CGI/1.1"
 		req.Params["REMOTE_ADDR"] = remoteAddr
 		req.Params["REMOTE_PORT"] = remotePort
@@ -158,10 +164,11 @@ func MapRemoteHost(inner SessionHandler) SessionHandler {
 
 // FilterAuthReqParams filter out FCGI_PARAMS key-value that is explicitly
 // forbidden to passed on in factcgi specification, include:
-//  CONTENT_LENGTH;
-//  PATH_INFO;
-//  PATH_TRANSLATED; and
-//  SCRIPT_NAME
+//
+//	CONTENT_LENGTH;
+//	PATH_INFO;
+//	PATH_TRANSLATED; and
+//	SCRIPT_NAME
 func FilterAuthReqParams(inner SessionHandler) SessionHandler {
 	return func(client Client, req *Request) (*ResponsePipe, error) {
 		delete(req.Params, "CONTENT_LENGTH")
@@ -194,13 +201,13 @@ type FileSystemRouter struct {
 // i.e. classic PHP hosting environment like Apache + mod_php
 //
 // Parameters included:
-//  PATH_INFO
-//  PATH_TRANSLATED
-//  SCRIPT_NAME
-//  SCRIPT_FILENAME
-//  DOCUMENT_URI
-//  DOCUMENT_ROOT
 //
+//	PATH_INFO
+//	PATH_TRANSLATED
+//	SCRIPT_NAME
+//	SCRIPT_FILENAME
+//	DOCUMENT_URI
+//	DOCUMENT_ROOT
 func (fs *FileSystemRouter) Router() Middleware {
 	pathinfoRe := regexp.MustCompile(`^(.+\.php)(/?.+)$`)
 	docroot := filepath.Join(fs.DocRoot) // converts to absolute path
@@ -251,7 +258,6 @@ func (fs *FileSystemRouter) Router() Middleware {
 // field.
 //
 // Note: HTTP_CONTENT_TYPE and HTTP_CONTENT_LENGTH cannot be overridden.
-//
 func MapHeader(inner SessionHandler) SessionHandler {
 	return func(client Client, req *Request) (*ResponsePipe, error) {
 		r := req.Raw
@@ -296,13 +302,13 @@ func MapHeader(inner SessionHandler) SessionHandler {
 // on its own). Suitable for web.py based application.
 //
 // Parameters included:
-//  PATH_INFO
-//  PATH_TRANSLATED
-//  SCRIPT_NAME
-//  SCRIPT_FILENAME
-//  DOCUMENT_URI
-//  DOCUMENT_ROOT
 //
+//	PATH_INFO
+//	PATH_TRANSLATED
+//	SCRIPT_NAME
+//	SCRIPT_FILENAME
+//	DOCUMENT_URI
+//	DOCUMENT_ROOT
 func MapEndpoint(endpointFile string) Middleware {
 	dir, webpath := filepath.Dir(endpointFile), "/"+filepath.Base(endpointFile)
 	return func(inner SessionHandler) SessionHandler {
