@@ -42,7 +42,7 @@ jobs:
       - name: Setup Node modules
         run: |
           cd ./example/nodejs
-          yarn install
+          npm install
           cd ../..
       - name: Setup Python3
         uses: actions/setup-python@v4
