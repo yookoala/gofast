@@ -27,7 +27,7 @@ jobs:
           - '1.21'
     env:
       # For test to correctly locate the OS's php-fpm
-      TEST_PHPFPM_PATH: /usr/sbin/php-fpm7.4
+      TEST_PHPFPM_PATH: /usr/sbin/php-fpm
       # For backward compatibility
       GO111MODULE: on
     steps:
@@ -35,6 +35,11 @@ jobs:
         uses: actions/checkout@v4
       - name: Install Tools for Tests
         run: sudo apt-get install -y php-fpm python3 python3-venv
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          # extensions: imagick, swoole
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -62,3 +67,15 @@ jobs:
           go mod download -x || go mod download
       - name: Run tests
         run: go test -race ./...
+      - name: Environment Info
+        run: |
+          which php-fpm
+          php-fpm --version
+          php -v
+          php -m
+          node -v
+          npm -v
+          python3 -V
+          python3 -m pip list
+          go version
+          go env
