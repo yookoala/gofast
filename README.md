@@ -26,7 +26,7 @@
 [travis]: https://travis-ci.com/github/yookoala/gofast?branch=main
 [travis-badge]: https://api.travis-ci.com/yookoala/gofast.svg?branch=main
 [github-action]: https://github.com/yookoala/gofast/actions?query=workflow%3ATests+branch%3Amain
-[github-action-badge]: https://github.com/yookoala/gofast/workflows/Tests/badge.svg?branch=main
+[github-action-badge]: https://github.com/yookoala/gofast/actions/workflows/ci.yml/badge.svg?branch=main
 [goreport]: https://goreportcard.com/report/github.com/yookoala/gofast
 [goreport-badge]: https://goreportcard.com/badge/github.com/yookoala/gofast
 [golang]: https://golang.org
